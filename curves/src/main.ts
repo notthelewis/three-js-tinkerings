@@ -16,23 +16,25 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 // 2D Curve
 // ===================================================
 
-const curve2d = new THREE.CurvePath<THREE.Vector2>();
+const greenCurve = new THREE.CurvePath<THREE.Vector2>();
+greenCurve.add(create2DCurve(  -8,0,  8,0,  1,4,  -2.7,-4  ));
+const gcGeometry = new THREE.BufferGeometry().setFromPoints(greenCurve.getPoints(42));
+const gcMaterial = new THREE.PointsMaterial({ size: 0.15, color: new THREE.Color(0,1,0)  });
+const gcPoints = new THREE.Points(gcGeometry, gcMaterial);
 
-// START_X,START_Y,  END_X,END_Y,  C1_X,C1_Y, C2_X,C2_Y
-//
-curve2d.add(create2DCurve( -10,0,  10,0,  2.5,10,  -2.5,-10));
+scene.add(gcPoints);
 
-const geometry2d = new THREE.BufferGeometry().setFromPoints(curve2d.getPoints(100));
-const material = new THREE.PointsMaterial({ size: 0.15, color: new THREE.Color(0,1,0)  });
-const points2d = new THREE.Points(geometry2d, material);
+const blueCurve = new THREE.CurvePath<THREE.Vector2>();
+blueCurve.add(create2DCurve(  -8,0,  8,1,  1,3,  -2.7,-5  ));
+const bcGeometetry = new THREE.BufferGeometry().setFromPoints(blueCurve.getPoints(42));
+const bcMaterial = new THREE.PointsMaterial({ size: 0.15, color: new THREE.Color(0,0,1)  });
+const bcPoints = new THREE.Points(bcGeometetry, bcMaterial);
 
-scene.add(points2d);
-
+scene.add(bcPoints);
 
 // Render
 // camera.position.set(-8, 5, 8);
 camera.position.setZ(10);
-camera.lookAt(0,0,0);
 renderer.render(scene, camera);
 
 
