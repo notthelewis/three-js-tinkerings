@@ -13,7 +13,14 @@ const segments = 2000;
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); 
 renderer.setSize(window.innerWidth, window.innerHeight);
 
-document.addEventListener("keypress", (e)=> running = !running && (e.key == " ") )
+document.addEventListener("keypress", (e)=> {
+  if (e.key == " " && running) {
+    running = false;
+  } else {
+    animate(0);
+  }
+})
+// document.addEventListener("keypress", (e)=> running = !running && (e.key == " ") )
 
 // ===================================================
 // 2D Curve
@@ -37,16 +44,18 @@ const blue = makeCurvePoints(
 scene.add(blue.obj);
 
 // Animate: tEnd goes 1 -> 0 -> 1 ...
-let tEnd = 0;
+let tEnd = 1;
 let dir = 1;
 
 let lastTime: DOMHighResTimeStamp;
 let running = true;
 
+renderer.render(scene, camera);
+
 function animate(t: DOMHighResTimeStamp) {
   requestAnimationFrame(animate);
   if (!running) {
-    lastTime = t;
+    lastTime = t
     return;
   }
 
@@ -71,7 +80,7 @@ function animate(t: DOMHighResTimeStamp) {
   renderer.render(scene, camera);
 }
 
-animate(0);
+// animate(0);
 
 
 // ===================================================
@@ -152,6 +161,6 @@ function create2DCurve(
   const vEnd = new THREE.Vector2(ex,ey);
   const c1 = new THREE.Vector2(c1x, c1y);
   const c2 = new THREE.Vector2(c2x, c2y);
-  return new THREE.CubicBezierCurve(vStart, c1, c2, vEnd);
+  return new THREE.CubicBezierCurve(vEnd, c2, c1, vStart);
 }
 
