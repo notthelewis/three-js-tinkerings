@@ -11,18 +11,6 @@ const renderer = new THREE.WebGLRenderer({ canvas });
 renderer.setPixelRatio(window.devicePixelRatio); 
 renderer.setSize(window.innerWidth, window.innerHeight);
 
-const material = new THREE.PointsMaterial({ size: 0.15, color: new THREE.Color(0,1,0)  });
-
-// ===================================================
-// 3D Curve
-// ===================================================
-// const curve = new THREE.CurvePath<THREE.Vector3>();
-// // curve.add( createCurveSC( -4, 0,-5,   0, 0, 3,  -4, 0, 3    ));
-// curve.add( createCurve(   -5, 0, 0,   5, 0, 3,   0, 0, 3,   3, 0, -6));
-// scene.add(new THREE.GridHelper(10, 10));
-// const geometry = new THREE.BufferGeometry().setFromPoints(curve.getPoints(10));
-// const points = new THREE.Points(geometry, material);
-// scene.add(points);
 
 // ===================================================
 // 2D Curve
@@ -35,6 +23,7 @@ const curve2d = new THREE.CurvePath<THREE.Vector2>();
 curve2d.add(create2DCurve( -10,0,  10,0,  2.5,10,  -2.5,-10));
 
 const geometry2d = new THREE.BufferGeometry().setFromPoints(curve2d.getPoints(100));
+const material = new THREE.PointsMaterial({ size: 0.15, color: new THREE.Color(0,1,0)  });
 const points2d = new THREE.Points(geometry2d, material);
 
 scene.add(points2d);
