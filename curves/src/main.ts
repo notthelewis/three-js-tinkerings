@@ -13,6 +13,12 @@ const segments = 400;
 renderer.setPixelRatio(window.devicePixelRatio); 
 renderer.setSize(window.innerWidth, window.innerHeight);
 
+document.addEventListener("keypress", (e)=> {
+  if (e.key == " ") {
+    running = !running;
+  }
+})
+
 
 // ===================================================
 // 2D Curve
