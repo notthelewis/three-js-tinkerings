@@ -13,16 +13,7 @@ const segments = 2000;
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); 
 renderer.setSize(window.innerWidth, window.innerHeight);
 
-document.addEventListener("keypress", (e)=> {
-  if (e.key == " ") {
-    if (!running) {
-      running = true;
-    } else {
-      running = false;
-    }
-  }
-})
-
+document.addEventListener("keypress", (e)=> running = !running && (e.key == " ") )
 
 // ===================================================
 // 2D Curve
@@ -55,6 +46,7 @@ let running = true;
 function animate(t: DOMHighResTimeStamp) {
   requestAnimationFrame(animate);
   if (!running) {
+    lastTime = t;
     return;
   }
 
@@ -121,6 +113,7 @@ function setExactEndPoint(
   pos.setXYZ(last, p.x, p.y, 0);
   pos.needsUpdate = true;
 }
+
 
 type N = number;
 
