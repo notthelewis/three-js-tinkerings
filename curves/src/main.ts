@@ -6,16 +6,20 @@ const canvas = document.querySelector("#bg");
 if (!canvas) { throw new Error("unable to get canvas!") }
 const scene = new THREE.Scene(); 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight , 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ canvas, powerPreference: "high-performance" });
+const renderer = new THREE.WebGLRenderer({ canvas, powerPreference: "low-power", antialias: true });
 
-const segments = 400;
+const segments = 2000;
 
-renderer.setPixelRatio(window.devicePixelRatio); 
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); 
 renderer.setSize(window.innerWidth, window.innerHeight);
 
 document.addEventListener("keypress", (e)=> {
   if (e.key == " ") {
-    running = !running;
+    if (!running) {
+      running = true;
+    } else {
+      running = false;
+    }
   }
 })
 
@@ -42,21 +46,24 @@ const blue = makeCurvePoints(
 scene.add(blue.obj);
 
 // Animate: tEnd goes 1 -> 0 -> 1 ...
-let tEnd = 1;
-let dir = -1;
+let tEnd = -1;
+let dir = 1;
 
+let lastTime: DOMHighResTimeStamp;
 let running = true;
 
-function animate() {
+function animate(t: DOMHighResTimeStamp) {
+  requestAnimationFrame(animate);
   if (!running) {
-    renderer.render(scene, camera);
-    requestAnimationFrame(animate);
     return;
   }
-  requestAnimationFrame(animate);
+
+  if (!lastTime) lastTime = t;
+  const d = (t - lastTime) / 1000;
+  lastTime = t;
 
   // Move tEnd
-  tEnd += dir * 0.005;
+  tEnd += dir * d * 0.5
   if (tEnd <= 0) { tEnd = 0; dir = 1; }
   if (tEnd >= 1) { tEnd = 1; dir = -1; }
 
@@ -66,14 +73,13 @@ function animate() {
   green.geom.setDrawRange(0, count);
   blue.geom.setDrawRange(0, count);
 
-
   setExactEndPoint(green.curve, green.geom, tEnd, count);
   setExactEndPoint(blue.curve, blue.geom, tEnd, count);
 
   renderer.render(scene, camera);
 }
 
-animate();
+animate(0);
 
 
 // ===================================================
