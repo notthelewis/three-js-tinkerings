@@ -6,7 +6,7 @@ const canvas = document.querySelector("#bg");
 if (!canvas) { throw new Error("unable to get canvas!") }
 const scene = new THREE.Scene(); 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight , 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ canvas, powerPreference: "low-power", antialias: true });
+const renderer = new THREE.WebGLRenderer({ canvas, powerPreference: "low-power", antialias: true, precision: "highp"});
 
 const segments = 2000;
 
@@ -34,19 +34,19 @@ camera.position.setZ(10);
 
 // Build once
 const green = makeCurvePoints(
-  create2DCurve(-4, 0, 4, 0, 0.5, 2, -1.35, -2),
+  create2DCurve(  -4, 0,  4, 0,  0.5, 2,  -1.35, -2  ),
   0x00ff00
 );
 scene.add(green.obj);
 
 const blue = makeCurvePoints(
-  create2DCurve(-4, 0, 4, 0.5, 0.5, 1.5, -1.35, -2.5),
+  create2DCurve(  -4, 0,  4, .5,  0.5, 1.5,  -1.35, -2.5  ),
   0x0000ff
 );
 scene.add(blue.obj);
 
 // Animate: tEnd goes 1 -> 0 -> 1 ...
-let tEnd = -1;
+let tEnd = 0;
 let dir = 1;
 
 let lastTime: DOMHighResTimeStamp;
