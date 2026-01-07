@@ -6,7 +6,9 @@ const canvas = document.querySelector("#bg");
 if (!canvas) { throw new Error("unable to get canvas!") }
 const scene = new THREE.Scene(); 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight , 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ canvas });
+const renderer = new THREE.WebGLRenderer({ canvas, powerPreference: "high-performance" });
+
+const segments = 400;
 
 renderer.setPixelRatio(window.devicePixelRatio); 
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -16,31 +18,97 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 // 2D Curve
 // ===================================================
 
-const greenCurve = new THREE.CurvePath<THREE.Vector2>();
-greenCurve.add(create2DCurve(  -8,0,  8,0,  1,4,  -2.7,-4  ));
-const gcGeometry = new THREE.BufferGeometry().setFromPoints(greenCurve.getPoints(42));
-const gcMaterial = new THREE.PointsMaterial({ size: 0.15, color: new THREE.Color(0,1,0)  });
-const gcPoints = new THREE.Points(gcGeometry, gcMaterial);
-
-scene.add(gcPoints);
-
-const blueCurve = new THREE.CurvePath<THREE.Vector2>();
-blueCurve.add(create2DCurve(  -8,0,  8,1,  1,3,  -2.7,-5  ));
-const bcGeometetry = new THREE.BufferGeometry().setFromPoints(blueCurve.getPoints(42));
-const bcMaterial = new THREE.PointsMaterial({ size: 0.15, color: new THREE.Color(0,0,1)  });
-const bcPoints = new THREE.Points(bcGeometetry, bcMaterial);
-
-scene.add(bcPoints);
-
 // Render
 // camera.position.set(-8, 5, 8);
 camera.position.setZ(10);
-renderer.render(scene, camera);
+
+// Build once
+const green = makeCurvePoints(
+  create2DCurve(-4, 0, 4, 0, 0.5, 2, -1.35, -2),
+  0x00ff00
+);
+scene.add(green.obj);
+
+const blue = makeCurvePoints(
+  create2DCurve(-4, 0, 4, 0.5, 0.5, 1.5, -1.35, -2.5),
+  0x0000ff
+);
+scene.add(blue.obj);
+
+// Animate: tEnd goes 1 -> 0 -> 1 ...
+let tEnd = 1;
+let dir = -1;
+
+let running = true;
+
+function animate() {
+  if (!running) {
+    renderer.render(scene, camera);
+    requestAnimationFrame(animate);
+    return;
+  }
+  requestAnimationFrame(animate);
+
+  // Move tEnd
+  tEnd += dir * 0.005;
+  if (tEnd <= 0) { tEnd = 0; dir = 1; }
+  if (tEnd >= 1) { tEnd = 1; dir = -1; }
+
+  // Convert tEnd to number of vertices to draw
+  const count = Math.max(2, Math.floor(tEnd * segments) + 1);
+
+  green.geom.setDrawRange(0, count);
+  blue.geom.setDrawRange(0, count);
+
+
+  setExactEndPoint(green.curve, green.geom, tEnd, count);
+  setExactEndPoint(blue.curve, blue.geom, tEnd, count);
+
+  renderer.render(scene, camera);
+}
+
+animate();
 
 
 // ===================================================
 // Helper methods
 // ===================================================
+
+function makeCurvePoints(curve: THREE.Curve<THREE.Vector2>, color: THREE.ColorRepresentation) {
+  // Precompute points (full curve)
+  const pts = curve.getPoints(segments);
+
+  // Geometry with 3D positions (z = 0)
+  const positions = new Float32Array((segments + 1) * 3);
+  for (let i = 0; i < pts.length; i++) {
+    positions[i * 3 + 0] = pts[i].x;
+    positions[i * 3 + 1] = pts[i].y;
+    positions[i * 3 + 2] = 0;
+  }
+
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geom.setDrawRange(0, segments + 1);
+
+  const mat = new THREE.PointsMaterial({ size: 0.15, color });
+  const obj = new THREE.Points(geom, mat);
+  return { obj, geom, curve };
+}
+
+function setExactEndPoint(
+  curve: THREE.Curve<THREE.Vector2>,
+  geom: THREE.BufferGeometry,
+  tEnd: number,
+  count: number
+) {
+  const p = curve.getPoint(tEnd);
+
+  const pos = geom.getAttribute("position") as THREE.BufferAttribute;
+  const last = count - 1;
+
+  pos.setXYZ(last, p.x, p.y, 0);
+  pos.needsUpdate = true;
+}
 
 type N = number;
 
