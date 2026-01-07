@@ -14,9 +14,12 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 
 document.addEventListener("keypress", (e)=> {
-  if (e.key == " " && running) {
+  if (e.key !== " ") return;
+
+  if (running) {
     running = false;
   } else {
+    running = true;
     animate(0);
   }
 })
