@@ -27,7 +27,7 @@ const blueCapSize  = pointSize + 0.11;
 // Fixed gutter (world units at z=0). This becomes:
 // - gap between left & right instances
 // - plus half-gutter padding to each screen edge
-const gutter = 2.0;
+const gutter = 0.1
 
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -61,6 +61,7 @@ const rightInstance = createCurveInstance({
 
 scene.add(leftInstance.group);
 scene.add(rightInstance.group);
+
 
 // Animation: tEnd goes 1 -> 0 -> 1 ...
 let tEnd = 1;
