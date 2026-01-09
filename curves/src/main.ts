@@ -40,21 +40,21 @@ document.addEventListener("keypress", (e) => {
 });
 
 // ===================================================
-// Build two instances (left & right)
+// Build two curve instances (left & right)
 // ===================================================
 
 const leftInstance = createCurveInstance({
-  //       start        end    control1       control2
-  //    s[x,  y]  e[x,   y]  c1[x,   y]    c2[x,    y]
-  green: [4,0.9,   -4, 0.1,   0.5,   2,   -1.35,   -2],
-  blue:  [4,0.9,   -4, 0.5,   0.5, 1.5,   -1.35, -2.5],
+  //         start        end    control1       control2
+  //    s[x,    y]  e[x,   y]  c1[x,   y]    c2[x,    y]
+  green: [4,  0.4,   -4, 0.1,   0.5,   2,   -1.35,   -2],
+  blue:  [4,  0.4,   -4, 0.5,   0.5, 1.5,   -1.35, -2.5],
 });
 
 const rightInstance = createCurveInstance({
-  //         start          end     control1      control2
-  //    s[   x,    y]  e[x,  y]  c1[x,    y]   c2[ x,   y]
-  green: [-4.0, -0.3,   4,   0,   -1.35,   -2,   0.5,   2],
-  blue:  [-4.0, -0.3,   4, 0.5,   -1.35, -2.5,   0.5, 1.5],
+  //         start          end       control1    control2
+  //    s[   x,    y]  e[x,  y]  c1[x,      y]   c2[ x, y]
+  green: [-4.0, -0.5,   4, 0.1,   -1.35, -2.5,   0.5,   2],
+  blue:  [-4.0, -0.5,   4, 0.5,   -1.35,   -2,   0.5, 1.5],
 });
 
 scene.add(leftInstance.group);
@@ -68,7 +68,18 @@ let lastTime: DOMHighResTimeStamp = new Date().getTime();
 // Layout once initially
 layoutInstances();
 
+// ===================================================
+// Create the play button orb 
+// ===================================================
+
+const circleGeometry = new THREE.CircleGeometry(0.5, 125);
+const circleMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFFF });
+const circle = new THREE.Mesh(circleGeometry, circleMaterial);
+scene.add(circle);
+
+
 renderer.render(scene, camera);
+
 
 function animate(t: DOMHighResTimeStamp) {
   requestAnimationFrame(animate);
