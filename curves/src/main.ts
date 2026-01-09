@@ -3,21 +3,15 @@ import * as THREE from "three";
 
 const canvas = document.querySelector("#bg");
 if (!canvas) throw new Error("unable to get canvas!");
-
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(
-  75,
-  window.innerWidth / window.innerHeight,
-  0.1,
-  1000
-);
-camera.position.setZ(10);
-
+const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({
   canvas,
   powerPreference: "low-power",
   antialias: true,
 });
+
+camera.position.setZ(10);
 
 const segments = 2000;
 const pointSize = 0.18;
