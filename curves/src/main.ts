@@ -6,7 +6,8 @@ const canvas = document.querySelector("#bg");
 if (!canvas) { throw new Error("unable to get canvas!") }
 const scene = new THREE.Scene(); 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight , 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ canvas, powerPreference: "low-power", antialias: true, precision: "highp"});
+const renderer = new THREE.WebGLRenderer({ canvas, powerPreference: "low-power", antialias: true });
+const pointLight = new THREE.PointLight(0xFFFFFF);
 
 const segments = 2000;
 
@@ -15,14 +16,16 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 
 document.addEventListener("keypress", (e)=> {
   if (e.key !== " ") return;
-
+  console.log(running)
   if (running) {
     running = false;
-  } else {
-    running = true;
-    animate(0);
-  }
-})
+    return;
+  } 
+
+  running = true;
+  animate(0);
+});
+
 // document.addEventListener("keypress", (e)=> running = !running && (e.key == " ") )
 
 // ===================================================
@@ -46,17 +49,23 @@ const blue = makeCurvePoints(
 );
 scene.add(blue.obj);
 
+pointLight.setRotationFromEuler(new THREE.Euler(0, 1, 0))
+scene.add(pointLight);
+const lightHelper = new THREE.PointLightHelper(pointLight);
+scene.add(lightHelper)
+
 // Animate: tEnd goes 1 -> 0 -> 1 ...
 let tEnd = 1;
-let dir = 1;
+let dir = -1;
 
 let lastTime: DOMHighResTimeStamp;
-let running = true;
+let running = false;
 
 renderer.render(scene, camera);
 
 function animate(t: DOMHighResTimeStamp) {
   requestAnimationFrame(animate);
+
   if (!running) {
     lastTime = t
     return;
@@ -82,8 +91,6 @@ function animate(t: DOMHighResTimeStamp) {
 
   renderer.render(scene, camera);
 }
-
-// animate(0);
 
 
 // ===================================================
