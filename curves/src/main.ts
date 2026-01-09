@@ -123,8 +123,6 @@ type Instance = {
   blueCap: THREE.Mesh;
   baseWidth: number; // unscaled width of the whole instance
   originOffset: THREE.Vector3;
-  greenCapSize: number;
-  blueCapSize: number;
 };
 
 type CurveParams = [
@@ -178,8 +176,6 @@ function createCurveInstance(p: CreateCurveInstanceParams): Instance {
     blueCap,
     baseWidth: size.x,
     originOffset, 
-    greenCapSize,
-    blueCapSize,
   };
 
   // Ensure initial draw state consistent
@@ -200,8 +196,8 @@ function updateCurveInstance(inst: Instance, tEnd: number) {
   // Uniform scaling, both groups are identical
   const s = inst.group.scale.x;
 
-  updateCap(inst.greenCap, inst.green.curve, tEnd, inst.originOffset, inst.greenCapSize, s);
-  updateCap(inst.blueCap, inst.blue.curve, tEnd, inst.originOffset, inst.blueCapSize, s);
+  updateCap(inst.greenCap, inst.green.curve, tEnd, inst.originOffset, greenCapSize, s);
+  updateCap(inst.blueCap,  inst.blue.curve,  tEnd, inst.originOffset, blueCapSize,  s);
 }
 
 function layoutInstances() {
@@ -344,7 +340,6 @@ function makeTeardropCap(color: THREE.ColorRepresentation, _size: number) {
   });
 
   const mesh = new THREE.Mesh(geom, mat);
-  // mesh.scale.setScalar(size);
   mesh.renderOrder = 10;
 
   return mesh;
