@@ -36,7 +36,7 @@ let running = false;
 document.addEventListener("keypress", (e) => {
   if (e.key !== " ") return;
   running = !running;
-  animate(lastTime ?? 0);
+  animate(lastTime);
 });
 
 // ===================================================
