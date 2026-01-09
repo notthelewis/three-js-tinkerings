@@ -125,6 +125,7 @@ type Instance = {
   originOffset: THREE.Vector3;
 };
 
+type N = number; 
 type CurveParams = [
   sx: N, sy: N,
   ex: N, ey: N,
@@ -134,7 +135,6 @@ type CurveParams = [
 
 type CreateCurveInstanceParams = {
   green: CurveParams;
-  // Blue curve
   blue: CurveParams;
 }
 
@@ -252,6 +252,14 @@ function normalizeGroupOrigin(group: THREE.Group): THREE.Vector3 {
 // HELPERS
 // ===================================================
 
+function create2DCurve([sx, sy, ex, ey, c1x, c1y, c2x, c2y]: CurveParams) {
+  const vStart = new THREE.Vector2(sx, sy); 
+  const vEnd = new THREE.Vector2(ex, ey);
+  const c1 = new THREE.Vector2(c1x, c1y);
+  const c2 = new THREE.Vector2(c2x, c2y);
+  return new THREE.CubicBezierCurve(vEnd, c2, c1, vStart);
+}
+
 function makeCurvePoints(curve: THREE.Curve<THREE.Vector2>, color: THREE.ColorRepresentation) {
   const pts = curve.getPoints(segments);
 
@@ -343,15 +351,5 @@ function makeTeardropCap(color: THREE.ColorRepresentation, _size: number) {
   mesh.renderOrder = 10;
 
   return mesh;
-}
-
-type N = number;
-
-function create2DCurve([sx, sy, ex, ey, c1x, c1y, c2x, c2y]: CurveParams) {
-  const vStart = new THREE.Vector2(sx, sy);
-  const vEnd = new THREE.Vector2(ex, ey);
-  const c1 = new THREE.Vector2(c1x, c1y);
-  const c2 = new THREE.Vector2(c2x, c2y);
-  return new THREE.CubicBezierCurve(vEnd, c2, c1, vStart);
 }
 
