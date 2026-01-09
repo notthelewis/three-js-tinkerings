@@ -36,7 +36,8 @@ let running = false;
 document.addEventListener("keypress", (e) => {
   if (e.key !== " ") return;
   running = !running;
-  if (running) animate(0);
+  if (running)
+    animate(lastTime ?? 0);
 });
 
 // ===================================================
@@ -51,13 +52,13 @@ leftInstance.group.rotateY(180);
 scene.add(leftInstance.group);
 scene.add(rightInstance.group);
 
-// Layout once initially
-layoutInstances();
-
 // Animation: tEnd goes 1 -> 0 -> 1 ...
 let tEnd = 1;
 let dir = -1;
 let lastTime: DOMHighResTimeStamp | undefined;
+
+// Layout once initially
+layoutInstances();
 
 renderer.render(scene, camera);
 
@@ -209,6 +210,9 @@ function layoutInstances() {
 
   leftInstance.group.position.set(-xCenter, 0, 0);
   rightInstance.group.position.set(+xCenter, 0, 0);
+
+  updateCurveInstance(leftInstance, tEnd);
+  updateCurveInstance(rightInstance, tEnd);
 }
 
 function getVisibleSizeAtZ0(cam: THREE.PerspectiveCamera) {
