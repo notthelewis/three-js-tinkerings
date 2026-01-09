@@ -43,16 +43,18 @@ document.addEventListener("keypress", (e) => {
 // Build two instances (left & right)
 // ===================================================
 
-// Curve params are 
 const leftInstance = createCurveInstance({
-  //    s[x,y]  e[x,   y]  c1[x,   y]    c2[x,    y]
-  green: [4,0,   -4,   0,   0.5,   2,   -1.35,   -2],
-  blue:  [4,0,   -4, 0.5,   0.5, 1.5,   -1.35, -2.5]
+  //     start        end    control1       control2
+  //    s[x,  y]  e[x,   y]  c1[x,   y]    c2[x,    y]
+  green: [4,0.9,   -4,   0,   0.5,   2,   -1.35,   -2],
+  blue:  [4,0.9,   -4, 0.5,   0.5, 1.5,   -1.35, -2.5],
 });
 
 const rightInstance = createCurveInstance({
-  green: [-4, 0, 4, 0, 0.5, 2, -1.35, -2],
-  blue: [-4, 0, 4, 0.5, 0.5, 1.5, -1.35, -2.5]
+  //         start        end     control1       control2
+  //    s[   x,  y]  e[x,  y]  c1[x,    y]   c2[ x,    y]
+  green: [-4.0, -0.3,   4,   0,   -1.35, -2,     0.5,  2],
+  blue:  [-4.0, -0.3,   4, 0.5,   -1.35, -2.5,   0.5,  1.5],
 });
 
 // leftInstance.group.rotateY(180);
