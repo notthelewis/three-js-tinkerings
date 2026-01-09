@@ -36,18 +36,26 @@ let running = false;
 document.addEventListener("keypress", (e) => {
   if (e.key !== " ") return;
   running = !running;
-  if (running)
-    animate(lastTime ?? 0);
+  animate();
 });
 
 // ===================================================
-// Build two identical instances (left & right)
+// Build two instances (left & right)
 // ===================================================
 
-const leftInstance = createCurveInstance();
-const rightInstance = createCurveInstance();
+// Curve params are 
+const leftInstance = createCurveInstance({
+  //    s[x,y]  e[x,   y]  c1[x,   y]    c2[x,    y]
+  green: [4,0,   -4,   0,   0.5,   2,   -1.35,   -2],
+  blue:  [4,0,   -4, 0.5,   0.5, 1.5,   -1.35, -2.5]
+});
 
-leftInstance.group.rotateY(180);
+const rightInstance = createCurveInstance({
+  green: [-4, 0, 4, 0, 0.5, 2, -1.35, -2],
+  blue: [-4, 0, 4, 0.5, 0.5, 1.5, -1.35, -2.5]
+});
+
+// leftInstance.group.rotateY(180);
 
 scene.add(leftInstance.group);
 scene.add(rightInstance.group);
@@ -55,28 +63,21 @@ scene.add(rightInstance.group);
 // Animation: tEnd goes 1 -> 0 -> 1 ...
 let tEnd = 1;
 let dir = -1;
-let lastTime: DOMHighResTimeStamp | undefined;
 
 // Layout once initially
 layoutInstances();
 
-
 renderer.render(scene, camera);
 
-function animate(t: DOMHighResTimeStamp) {
+function animate() {
   requestAnimationFrame(animate);
 
   if (!running) {
-    lastTime = t;
     return;
   }
 
-  if (lastTime === undefined) lastTime = t;
-  const d = (t - lastTime) / 1000;
-  lastTime = t;
-
   // Move tEnd
-  tEnd += dir * d * 0.5;
+  tEnd += dir * 0.004;
   if (tEnd <= 0) { tEnd = 0; dir = 1; }
   if (tEnd >= 1) { tEnd = 1; dir = -1; }
 
@@ -121,18 +122,25 @@ type Instance = {
   blueCapSize: number;
 };
 
-function createCurveInstance(): Instance {
+type CurveParams = [
+  sx: N, sy: N,
+  ex: N, ey: N,
+  c1x: N, c1y: N,
+  c2x: N, c2y: N,
+];
+
+type CreateCurveInstanceParams = {
+  green: CurveParams;
+  // Blue curve
+  blue: CurveParams;
+}
+
+function createCurveInstance(p: CreateCurveInstanceParams): Instance {
   const group = new THREE.Group();
 
   // Curves 
-  const green = makeCurvePoints(
-    create2DCurve(-4, 0, 4, 0, 0.5, 2, -1.35, -2),
-    0x00ff00
-  );
-  const blue = makeCurvePoints(
-    create2DCurve(-4, 0, 4, 0.5, 0.5, 1.5, -1.35, -2.5),
-    0x0000ff
-  );
+  const green = makeCurvePoints( create2DCurve(p.green), 0x00ff00 );
+  const blue  = makeCurvePoints( create2DCurve(p.blue), 0x0000ff );
 
   group.add(green.obj);
   group.add(blue.obj);
@@ -339,7 +347,7 @@ function makeTeardropCap(color: THREE.ColorRepresentation, _size: number) {
 
 type N = number;
 
-function create2DCurve(sx: N, sy: N, ex: N, ey: N, c1x: N, c1y: N, c2x: N, c2y: N) {
+function create2DCurve([sx, sy, ex, ey, c1x, c1y, c2x, c2y]: CurveParams) {
   const vStart = new THREE.Vector2(sx, sy);
   const vEnd = new THREE.Vector2(ex, ey);
   const c1 = new THREE.Vector2(c1x, c1y);
