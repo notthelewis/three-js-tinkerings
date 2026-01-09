@@ -60,7 +60,7 @@ let lastTime: DOMHighResTimeStamp;
 let running = false;
 
 updateCap(greenCap, green.curve, tEnd);
-// NOTE: set same position as green curve so there's no weird overlap on the triangl cap at initial render  
+// NOTE: set same position as green curve so there's no weird overlap on the triangle cap at initial render 
 updateCap(blueCap, green.curve, tEnd);
 
 renderer.render(scene, camera);
