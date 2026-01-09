@@ -57,8 +57,6 @@ const rightInstance = createCurveInstance({
   blue:  [-4.0, -0.3,   4, 0.5,   -1.35, -2.5,   0.5, 1.5],
 });
 
-// leftInstance.group.rotateY(180);
-
 scene.add(leftInstance.group);
 scene.add(rightInstance.group);
 
@@ -162,7 +160,7 @@ function createCurveInstance(p: CreateCurveInstanceParams): Instance {
 
   // Put caps at initial end position (tEnd = 1)
   updateCap(greenCap, green.curve, 1, originOffset, greenCapSize, 0);
-  updateCap(blueCap, blue.curve, 1, originOffset, blueCapSize, 0);
+  updateCap(blueCap,   blue.curve, 1, originOffset, blueCapSize, 0);
 
   // Compute unscaled width once (for later layout scaling)
   group.updateMatrixWorld(true);
