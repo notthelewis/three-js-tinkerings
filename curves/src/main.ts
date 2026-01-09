@@ -32,7 +32,6 @@ document.addEventListener("keypress", (e)=> {
 // ===================================================
 
 // Render
-// camera.position.set(-8, 5, 8);
 camera.position.setZ(10);
 
 // Build once
@@ -107,7 +106,16 @@ function makeCurvePoints(curve: THREE.Curve<THREE.Vector2>, color: THREE.ColorRe
   geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   geom.setDrawRange(0, segments + 1);
 
-  const mat = new THREE.PointsMaterial({ size: 0.20, color });
+  const mat = new THREE.PointsMaterial({
+    size: 0.18,
+    color,
+    // PERF: These three parameters should reduce overall rendering overhead 
+    // (if my interpretation of docs is correct)
+    forceSinglePass: true, 
+    depthWrite: true,
+    side: THREE.FrontSide,
+  });
+
   const obj = new THREE.Points(geom, mat);
   return { obj, geom, curve };
 }
