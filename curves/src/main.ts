@@ -9,6 +9,7 @@ const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerH
 const renderer = new THREE.WebGLRenderer({ canvas, powerPreference: "low-power", antialias: true });
 
 const segments = 2000;
+const pointSize = 0.18;
 
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); 
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -24,8 +25,6 @@ document.addEventListener("keypress", (e)=> {
   running = true;
   animate(0);
 });
-
-// document.addEventListener("keypress", (e)=> running = !running && (e.key == " ") )
 
 // ===================================================
 // 2D Curve
@@ -48,8 +47,8 @@ const blue = makeCurvePoints(
 scene.add(blue.obj);
 
 // Line caps to make the end look purrty
-const greenCap = makeTriangleCap(0x00ff00);
-const blueCap  = makeTriangleCap(0x0000ff);
+const greenCap = makeTriangleCap(0x00ff00, pointSize + 0.03);
+const blueCap  = makeTriangleCap(0x0000ff, pointSize + 0.03);
 scene.add(greenCap);
 scene.add(blueCap);
 
@@ -59,6 +58,10 @@ let dir = -1;
 
 let lastTime: DOMHighResTimeStamp;
 let running = false;
+
+updateCap(greenCap, green.curve, tEnd);
+// NOTE: set same position as green curve so there's no weird overlap on the triangl cap at initial render  
+updateCap(blueCap, green.curve, tEnd);
 
 renderer.render(scene, camera);
 
@@ -88,8 +91,8 @@ function animate(t: DOMHighResTimeStamp) {
   setExactEndPoint(green.curve, green.geom, tEnd, count);
   setExactEndPoint(blue.curve, blue.geom, tEnd, count);
 
-  updateCap(greenCap, green.curve, tEnd, dir);
-  updateCap(blueCap, blue.curve, tEnd, dir);
+  updateCap(greenCap, green.curve, tEnd);
+  updateCap(blueCap, blue.curve, tEnd);
 
   renderer.render(scene, camera);
 }
@@ -116,7 +119,7 @@ function makeCurvePoints(curve: THREE.Curve<THREE.Vector2>, color: THREE.ColorRe
   geom.setDrawRange(0, segments + 1);
 
   const mat = new THREE.PointsMaterial({
-    size: 0.18,
+    size: pointSize,
     color,
     // PERF: These three parameters should reduce overall rendering overhead 
     // (if my interpretation of docs is correct)
@@ -185,39 +188,43 @@ function create2DCurve(
   return new THREE.CubicBezierCurve(vEnd, c2, c1, vStart);
 }
 
-function makeTriangleCap(color: THREE.ColorRepresentation) {
-  // Triangle points "forward" along +X by default, with its TIP at the origin.
-  // That means when we set position to the curve end, the tip sits exactly on the end.
-  const len = 0.45;    // length of cap (world units)
-  const halfW = 0.22;  // half width of base
-
+function makeTriangleCap(
+  color: THREE.ColorRepresentation,
+  size: number
+) {
+  // Unit triangle where the BASE is at x=0 and the TIP is at x=1.
+  // That means when positioned at the curve end, the BASE touches the line,
+  // and the triangle points "forward" (along +X) away from the line.
   const geom = new THREE.BufferGeometry();
   geom.setAttribute(
     "position",
     new THREE.BufferAttribute(
       new Float32Array([
-        0, 0, 0,          // tip
-        -len,  halfW, 0,  // base top
-        -len, -halfW, 0,  // base bottom
+        0,  0.45, 0,  // base top (at end point)
+        0, -0.45, 0,  // base bottom (at end point)
+        1,  0.00, 0,  // tip (points away)
       ]),
       3
     )
   );
-
-  // Optional: gives nicer shading when any lighting is present (even though we use MeshBasicMaterial)
-  geom.computeVertexNormals();
 
   const mat = new THREE.MeshBasicMaterial({
     color,
     side: THREE.DoubleSide,
     transparent: true,
     opacity: 1,
-    depthTest: false,  // keep it on top of the points
+    depthTest: false,
     depthWrite: false,
   });
 
   const mesh = new THREE.Mesh(geom, mat);
-  mesh.renderOrder = 10; // ensure drawn after points
+
+  // Scale to match your points "visual weight"
+  mesh.scale.setScalar(size);
+
+  // Keep on top of the points
+  mesh.renderOrder = 10;
+
   return mesh;
 }
 
@@ -225,20 +232,17 @@ function updateCap(
   cap: THREE.Mesh,
   curve: THREE.Curve<THREE.Vector2>,
   tEnd: number,
-  dir: number
 ) {
-  // Position at curve end
+  // Place at curve end
   const p = curve.getPoint(tEnd);
-  cap.position.set(p.x, p.y, 0);
+  cap.position.set(p.x, p.y, cap.position.z);
 
-  // Tangent at curve end (direction of increasing t)
-  const tan = curve.getTangent(tEnd).clone().normalize();
+  // Tangent can be weird at exactly 0/1 on some curves; sample slightly inside.
+  const te = Math.min(0.9999, Math.max(0.0001, tEnd));
+  const tan = curve.getTangent(te).normalize();
 
-  // If you want the cap to face the *motion direction* (looks nicer when reversing),
-  // flip the tangent when tEnd is moving backwards.
-  // dir < 0 means tEnd is decreasing, so motion is along -tangent.
-  if (dir < 0) tan.multiplyScalar(-1);
-
+  // Rotate so +X aligns with tan
   const angle = Math.atan2(tan.y, tan.x);
   cap.rotation.set(0, 0, angle);
 }
+
