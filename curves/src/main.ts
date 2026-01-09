@@ -1,24 +1,32 @@
 import "./style.css";
 import * as THREE from "three";
 
+const VIEW_HEIGHT   = 10; // World units visible vertically
+const POINT_PX      =  7; // Dot thickness in pixels 
+const CAP_PX_GREEN  = POINT_PX * 1.4;
+const CAP_PX_BLUE   = POINT_PX * 1.45;
+
+const GREEN = 0x00ff00;
+const BLUE  = 0x0000ff;
+
 const canvas = document.querySelector("#bg");
 if (!canvas) throw new Error("unable to get canvas!");
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+
+const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
+camera.position.set(0,0,10);
+camera.lookAt(0,0,0);
+
+updateOrthoCamera();
+
 const renderer = new THREE.WebGLRenderer({
   canvas,
   powerPreference: "low-power",
   antialias: true,
 });
 
-camera.position.setZ(10);
-
-const p = window.innerWidth / window.innerHeight;
-
 const segments = 2000;
-const pointSize = p * 0.09;
-const greenCapSize = pointSize + 0.1;
-const blueCapSize  = pointSize + 0.11;
 
 // Fixed gutter (world units at z=0). This becomes:
 // - gap between left & right instances
@@ -102,13 +110,12 @@ function animate(t: DOMHighResTimeStamp) {
 
 // Keep layout correct on resize
 window.addEventListener("resize", () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
 
+  updateOrthoCamera();
   layoutInstances();
+
   renderer.render(scene, camera);
 });
 
@@ -134,8 +141,8 @@ type Instance = {
 
 type N = number; 
 type CurveParams = [
-  sx: N, sy: N,
-  ex: N, ey: N,
+  sx:  N, sy:  N,
+  ex:  N, ey:  N,
   c1x: N, c1y: N,
   c2x: N, c2y: N,
 ];
@@ -149,15 +156,15 @@ function createCurveInstance(p: CreateCurveInstanceParams): Instance {
   const group = new THREE.Group();
 
   // Curves 
-  const green = makeCurvePoints( create2DCurve(p.green), 0x00ff00 );
-  const blue  = makeCurvePoints( create2DCurve(p.blue), 0x0000ff );
+  const green = makeCurvePoints( create2DCurve(p.green), GREEN );
+  const blue  = makeCurvePoints( create2DCurve(p.blue),  BLUE );
 
   group.add(green.obj);
   group.add(blue.obj);
 
   // Caps (teardrops)
-  const greenCap = makeTeardropCap(0x00ff00, greenCapSize);
-  const blueCap  = makeTeardropCap(0x0000ff, blueCapSize);
+  const greenCap = makeTeardropCap(0x00ff00, CAP_PX_GREEN);
+  const blueCap  = makeTeardropCap(0x0000ff, CAP_PX_BLUE);
 
   group.add(greenCap);
   group.add(blueCap);
@@ -166,8 +173,8 @@ function createCurveInstance(p: CreateCurveInstanceParams): Instance {
   const originOffset = normalizeGroupOrigin(group);
 
   // Put caps at initial end position (tEnd = 1)
-  updateCap(greenCap, green.curve, 1, originOffset, greenCapSize, 0);
-  updateCap(blueCap,   blue.curve, 1, originOffset, blueCapSize, 0);
+  updateCap(greenCap, green.curve, 1, originOffset, CAP_PX_GREEN, 0);
+  updateCap(blueCap,   blue.curve, 1, originOffset, CAP_PX_BLUE,  0);
 
   // Compute unscaled width once (for later layout scaling)
   group.updateMatrixWorld(true);
@@ -203,13 +210,13 @@ function updateCurveInstance(inst: Instance, tEnd: number) {
   // Uniform scaling, both groups are identical
   const s = inst.group.scale.x;
 
-  updateCap(inst.greenCap, inst.green.curve, tEnd, inst.originOffset, greenCapSize, s);
-  updateCap(inst.blueCap,  inst.blue.curve,  tEnd, inst.originOffset, blueCapSize,  s);
+  updateCap(inst.greenCap, inst.green.curve, tEnd, inst.originOffset, CAP_PX_GREEN, s);
+  updateCap(inst.blueCap,  inst.blue.curve,  tEnd, inst.originOffset, CAP_PX_BLUE,  s);
 }
 
 function layoutInstances() {
   // Visible width at z=0 plane (where your points are)
-  const v = getVisibleSizeAtZ0(camera);
+  const v = getVisibleSize(camera);
 
   // Each instance should take up 50% of the visible width minus a fixed gutter
   const targetWidth = Math.max(0.001, v.width * 0.5 - gutter);
@@ -232,12 +239,9 @@ function layoutInstances() {
   updateCurveInstance(rightInstance, tEnd);
 }
 
-function getVisibleSizeAtZ0(cam: THREE.PerspectiveCamera) {
-  // camera looks down -Z; our geometry is on z=0; camera at z=cam.position.z
-  const dist = cam.position.z; // assumes z=0 plane
-  const vFov = THREE.MathUtils.degToRad(cam.fov);
-  const height = 2 * Math.tan(vFov * 0.5) * dist;
-  const width = height * cam.aspect;
+function getVisibleSize(cam: THREE.OrthographicCamera) {
+  const width = (cam.right - cam.left) / cam.zoom;
+  const height = (cam.top - cam.bottom) / cam.zoom;
   return { width, height };
 }
 
@@ -258,6 +262,17 @@ function normalizeGroupOrigin(group: THREE.Group): THREE.Vector3 {
 // ===================================================
 // HELPERS
 // ===================================================
+
+function updateOrthoCamera() {
+  const aspect = window.innerWidth / window.innerHeight;
+
+  camera.top = VIEW_HEIGHT / 2;
+  camera.bottom = -VIEW_HEIGHT / 2;
+  camera.left = -(VIEW_HEIGHT * aspect) / 2;
+  camera.right = (VIEW_HEIGHT * aspect) / 2;
+
+  camera.updateProjectionMatrix();
+}
 
 function create2DCurve([sx, sy, ex, ey, c1x, c1y, c2x, c2y]: CurveParams) {
   const vStart = new THREE.Vector2(sx, sy); 
@@ -282,7 +297,8 @@ function makeCurvePoints(curve: THREE.Curve<THREE.Vector2>, color: THREE.ColorRe
   geom.setDrawRange(0, segments + 1);
 
   const mat = new THREE.PointsMaterial({
-    size: pointSize,
+    size: POINT_PX,
+    sizeAttenuation: false,
     color,
     forceSinglePass: true,
     depthWrite: true,
@@ -312,7 +328,7 @@ function updateCap(
   curve: THREE.Curve<THREE.Vector2>,
   tEnd: number,
   originOffset: THREE.Vector3,
-  desiredSize: number,
+  desiredPx: number,
   groupScale: number,
 ) {
   // Position at the curve end BUT in the group's central, local space. 
@@ -325,9 +341,12 @@ function updateCap(
   const angle = Math.atan2(tan.y, tan.x);
   cap.rotation.set(0, 0, angle);
 
+  const wpp = worldUnitsPerPixelOrtho(camera, renderer); 
+  const desiredWorld = desiredPx * wpp;
+
   // Counter-scale the mesh to ensure it doesn't grow when the group itself scales
   const inverse = groupScale !== 0 ? 1 / groupScale : 1; 
-  cap.scale.setScalar(desiredSize * inverse);
+  cap.scale.setScalar(desiredWorld * inverse);
 }
 
 function makeTeardropCap(color: THREE.ColorRepresentation, _size: number) {
@@ -358,5 +377,15 @@ function makeTeardropCap(color: THREE.ColorRepresentation, _size: number) {
   mesh.renderOrder = 10;
 
   return mesh;
+}
+
+function worldUnitsPerPixelOrtho(
+  cam: THREE.OrthographicCamera,
+  renderer: THREE.WebGLRenderer
+) {
+  // drawing-buffer height already includes DPR
+  const pxH = renderer.domElement.height;
+  const visibleH = (cam.top - cam.bottom) / cam.zoom;
+  return visibleH / pxH;
 }
 
