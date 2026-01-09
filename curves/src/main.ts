@@ -47,8 +47,11 @@ const blue = makeCurvePoints(
 scene.add(blue.obj);
 
 // Line caps to make the end look purrty
-const greenCap = makeTriangleCap(0x00ff00, pointSize + 0.03);
-const blueCap  = makeTriangleCap(0x0000ff, pointSize + 0.03);
+// const greenCap = makeTriangleCap(0x00ff00, pointSize + 0.03);
+// const blueCap  = makeTriangleCap(0x0000ff, pointSize + 0.03);
+const greenCap = makeTeardropCap(0x00ff00, pointSize + 0.1);
+const blueCap = makeTeardropCap(0x0000ff, pointSize + 0.11);
+
 scene.add(greenCap);
 scene.add(blueCap);
 
@@ -188,7 +191,7 @@ function create2DCurve(
   return new THREE.CubicBezierCurve(vEnd, c2, c1, vStart);
 }
 
-function makeTriangleCap(
+export function makeTriangleCap(
   color: THREE.ColorRepresentation,
   size: number
 ) {
@@ -244,5 +247,59 @@ function updateCap(
   // Rotate so +X aligns with tan
   const angle = Math.atan2(tan.y, tan.x);
   cap.rotation.set(0, 0, angle);
+}
+
+function makeTeardropCap(
+  color: THREE.ColorRepresentation,
+  size: number
+) {
+  // Teardrop points along +X.
+  // Base is centered on x=0 (so it "touches" the line end), tip extends to +X.
+  //
+  // Unit-ish dimensions (we scale by `size` after):
+  const tipX = 0.2;     // tip length
+  const baseX = 0.0;    // base anchor (touch point)
+  const r = 0.3         // roundness radius (controls width + base bulge)
+  const pinchY = 0.01;  // how "pinched" the shoulders are (smaller => more drop-like)
+
+  const shape = new THREE.Shape();
+
+  // Start at base-top
+  shape.moveTo(baseX, r);
+
+  // Curve up toward the shoulder near the tip (top edge)
+  shape.quadraticCurveTo(0.55, pinchY, tipX, 0.0);
+
+  // Curve back to base-bottom (bottom edge)
+  shape.quadraticCurveTo(0.55, -pinchY, baseX, -r);
+
+  // Make a nicely rounded base back to base-top
+  // (bulging slightly backwards makes it feel "pill/tear" rather than "leaf")
+  shape.quadraticCurveTo(-0.25, 0.0, baseX, r);
+
+  const geom = new THREE.ShapeGeometry(shape, 32); // segments controls smoothness
+
+  // Centering: keep base at x=0 for correct anchoring.
+  // ShapeGeometry ends up in the correct local space already, but we can ensure no Z drift:
+  geom.translate(0, 0, 0);
+
+  const mat = new THREE.MeshBasicMaterial({
+    color,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 1,
+    depthTest: false,
+    depthWrite: false,
+  });
+
+  const mesh = new THREE.Mesh(geom, mat);
+
+  // Scale to match your points
+  mesh.scale.setScalar(size);
+
+  // Keep on top of points
+  mesh.renderOrder = 10;
+
+  return mesh;
 }
 
