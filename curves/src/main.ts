@@ -44,9 +44,9 @@ document.addEventListener("keypress", (e) => {
 // ===================================================
 
 const leftInstance = createCurveInstance({
-  //     start        end    control1       control2
+  //       start        end    control1       control2
   //    s[x,  y]  e[x,   y]  c1[x,   y]    c2[x,    y]
-  green: [4,0.9,   -4,   0,   0.5,   2,   -1.35,   -2],
+  green: [4,0.9,   -4, 0.1,   0.5,   2,   -1.35,   -2],
   blue:  [4,0.9,   -4, 0.5,   0.5, 1.5,   -1.35, -2.5],
 });
 
