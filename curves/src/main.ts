@@ -60,6 +60,7 @@ let lastTime: DOMHighResTimeStamp | undefined;
 // Layout once initially
 layoutInstances();
 
+
 renderer.render(scene, camera);
 
 function animate(t: DOMHighResTimeStamp) {
