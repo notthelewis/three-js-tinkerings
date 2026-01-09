@@ -51,17 +51,16 @@ const leftInstance = createCurveInstance({
 });
 
 const rightInstance = createCurveInstance({
-  //         start        end     control1       control2
-  //    s[   x,  y]  e[x,  y]  c1[x,    y]   c2[ x,    y]
-  green: [-4.0, -0.3,   4,   0,   -1.35, -2,     0.5,  2],
-  blue:  [-4.0, -0.3,   4, 0.5,   -1.35, -2.5,   0.5,  1.5],
+  //         start          end     control1      control2
+  //    s[   x,    y]  e[x,  y]  c1[x,    y]   c2[ x,   y]
+  green: [-4.0, -0.3,   4,   0,   -1.35,   -2,   0.5,   2],
+  blue:  [-4.0, -0.3,   4, 0.5,   -1.35, -2.5,   0.5, 1.5],
 });
 
 // leftInstance.group.rotateY(180);
 
 scene.add(leftInstance.group);
 scene.add(rightInstance.group);
-
 
 // Animation: tEnd goes 1 -> 0 -> 1 ...
 let tEnd = 1;
