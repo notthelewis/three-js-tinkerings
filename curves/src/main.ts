@@ -13,8 +13,10 @@ const renderer = new THREE.WebGLRenderer({
 
 camera.position.setZ(10);
 
+const p = window.innerWidth / window.innerHeight;
+
 const segments = 2000;
-const pointSize = 0.18;
+const pointSize = p * 0.09;
 const greenCapSize = pointSize + 0.1;
 const blueCapSize  = pointSize + 0.11;
 
@@ -87,7 +89,7 @@ function animate(t: DOMHighResTimeStamp) {
   lastTime = t;
 
   // Move tEnd
-  tEnd += dir * d * 0.5;
+  tEnd += dir * d * 0.4;
   if (tEnd <= 0) { tEnd = 0; dir = 1; }
   if (tEnd >= 1) { tEnd = 1; dir = -1; }
 
