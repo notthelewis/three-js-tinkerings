@@ -7,7 +7,6 @@ if (!canvas) { throw new Error("unable to get canvas!") }
 const scene = new THREE.Scene(); 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight , 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ canvas, powerPreference: "low-power", antialias: true });
-const pointLight = new THREE.PointLight(0xFFFFFF);
 
 const segments = 2000;
 
@@ -48,11 +47,6 @@ const blue = makeCurvePoints(
   0x0000ff
 );
 scene.add(blue.obj);
-
-pointLight.setRotationFromEuler(new THREE.Euler(0, 1, 0))
-scene.add(pointLight);
-const lightHelper = new THREE.PointLightHelper(pointLight);
-scene.add(lightHelper)
 
 // Animate: tEnd goes 1 -> 0 -> 1 ...
 let tEnd = 1;
@@ -113,7 +107,7 @@ function makeCurvePoints(curve: THREE.Curve<THREE.Vector2>, color: THREE.ColorRe
   geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   geom.setDrawRange(0, segments + 1);
 
-  const mat = new THREE.PointsMaterial({ size: 0.15, color });
+  const mat = new THREE.PointsMaterial({ size: 0.20, color });
   const obj = new THREE.Points(geom, mat);
   return { obj, geom, curve };
 }
