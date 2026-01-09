@@ -36,7 +36,7 @@ let running = false;
 document.addEventListener("keypress", (e) => {
   if (e.key !== " ") return;
   running = !running;
-  animate();
+  animate(lastTime ?? 0);
 });
 
 // ===================================================
@@ -63,26 +63,31 @@ scene.add(rightInstance.group);
 // Animation: tEnd goes 1 -> 0 -> 1 ...
 let tEnd = 1;
 let dir = -1;
+let lastTime: DOMHighResTimeStamp = new Date().getTime();
 
 // Layout once initially
 layoutInstances();
 
 renderer.render(scene, camera);
 
-function animate() {
+function animate(t: DOMHighResTimeStamp) {
   requestAnimationFrame(animate);
 
   if (!running) {
+    lastTime = t;
     return;
   }
 
+  const d = (t - lastTime) / 1000;
+  lastTime = t;
+
   // Move tEnd
-  tEnd += dir * 0.004;
+  tEnd += dir * d * 0.5;
   if (tEnd <= 0) { tEnd = 0; dir = 1; }
   if (tEnd >= 1) { tEnd = 1; dir = -1; }
 
   // Update both instances
-  updateCurveInstance(leftInstance, tEnd);
+  updateCurveInstance(leftInstance,  tEnd);
   updateCurveInstance(rightInstance, tEnd);
 
   renderer.render(scene, camera);
