@@ -47,6 +47,12 @@ const blue = makeCurvePoints(
 );
 scene.add(blue.obj);
 
+// Line caps to make the end look purrty
+const greenCap = makeTriangleCap(0x00ff00);
+const blueCap  = makeTriangleCap(0x0000ff);
+scene.add(greenCap);
+scene.add(blueCap);
+
 // Animate: tEnd goes 1 -> 0 -> 1 ...
 let tEnd = 1;
 let dir = -1;
@@ -81,6 +87,9 @@ function animate(t: DOMHighResTimeStamp) {
 
   setExactEndPoint(green.curve, green.geom, tEnd, count);
   setExactEndPoint(blue.curve, blue.geom, tEnd, count);
+
+  updateCap(greenCap, green.curve, tEnd, dir);
+  updateCap(blueCap, blue.curve, tEnd, dir);
 
   renderer.render(scene, camera);
 }
@@ -176,3 +185,60 @@ function create2DCurve(
   return new THREE.CubicBezierCurve(vEnd, c2, c1, vStart);
 }
 
+function makeTriangleCap(color: THREE.ColorRepresentation) {
+  // Triangle points "forward" along +X by default, with its TIP at the origin.
+  // That means when we set position to the curve end, the tip sits exactly on the end.
+  const len = 0.45;    // length of cap (world units)
+  const halfW = 0.22;  // half width of base
+
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute(
+    "position",
+    new THREE.BufferAttribute(
+      new Float32Array([
+        0, 0, 0,          // tip
+        -len,  halfW, 0,  // base top
+        -len, -halfW, 0,  // base bottom
+      ]),
+      3
+    )
+  );
+
+  // Optional: gives nicer shading when any lighting is present (even though we use MeshBasicMaterial)
+  geom.computeVertexNormals();
+
+  const mat = new THREE.MeshBasicMaterial({
+    color,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 1,
+    depthTest: false,  // keep it on top of the points
+    depthWrite: false,
+  });
+
+  const mesh = new THREE.Mesh(geom, mat);
+  mesh.renderOrder = 10; // ensure drawn after points
+  return mesh;
+}
+
+function updateCap(
+  cap: THREE.Mesh,
+  curve: THREE.Curve<THREE.Vector2>,
+  tEnd: number,
+  dir: number
+) {
+  // Position at curve end
+  const p = curve.getPoint(tEnd);
+  cap.position.set(p.x, p.y, 0);
+
+  // Tangent at curve end (direction of increasing t)
+  const tan = curve.getTangent(tEnd).clone().normalize();
+
+  // If you want the cap to face the *motion direction* (looks nicer when reversing),
+  // flip the tangent when tEnd is moving backwards.
+  // dir < 0 means tEnd is decreasing, so motion is along -tangent.
+  if (dir < 0) tan.multiplyScalar(-1);
+
+  const angle = Math.atan2(tan.y, tan.x);
+  cap.rotation.set(0, 0, angle);
+}
