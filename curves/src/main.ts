@@ -1,10 +1,11 @@
 import "./style.css";
 import * as THREE from "three";
 
-const VIEW_HEIGHT   = 10; // World units visible vertically
-const POINT_PX      =  7; // Dot thickness in pixels 
-const CAP_PX_GREEN  = POINT_PX * 1.4;
-const CAP_PX_BLUE   = POINT_PX * 1.45;
+const VIEW_HEIGHT   = 20; // World units visible vertically
+const POINT_PX      = 15; // Dot thickness in pixels 
+const CAP_PX_GREEN  = POINT_PX * 1.2;
+const CAP_PX_BLUE   = POINT_PX * 1.4;
+
 
 const GREEN = 0x00ff00;
 const BLUE  = 0x0000ff;
@@ -13,10 +14,11 @@ const canvas = document.querySelector("#bg");
 if (!canvas) throw new Error("unable to get canvas!");
 const scene = new THREE.Scene();
 
-
 const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
 camera.position.set(0,0,10);
 camera.lookAt(0,0,0);
+
+const setObjectZ = (obj: THREE.Object3D, z: number) => obj.position.z = z;
 
 updateOrthoCamera();
 
@@ -29,7 +31,7 @@ const renderer = new THREE.WebGLRenderer({
 const segments = 2000;
 
 // Fixed gutter (world units at z=0). This becomes:
-// - gap between left & right instances
+// - gap between left & right instaces
 // - plus half-gutter padding to each screen edge
 const gutter = 0.1
 
@@ -44,7 +46,7 @@ document.addEventListener("keypress", (e) => {
 });
 
 // ===================================================
-// Build two curve instances (left & right)
+// Build two curv instances (left & right)
 // ===================================================
 
 const leftInstance = createCurveInstance({
@@ -86,7 +88,7 @@ renderer.render(scene, camera);
 
 
 function animate(t: DOMHighResTimeStamp) {
-  requestAnimationFrame(animate);
+  const handle = requestAnimationFrame(animate);
 
   if (!running) {
     lastTime = t;
@@ -96,10 +98,20 @@ function animate(t: DOMHighResTimeStamp) {
   const d = (t - lastTime) / 1000;
   lastTime = t;
 
-  // Move tEnd
-  tEnd += dir * d * 0.4;
-  if (tEnd <= 0) { tEnd = 0; dir = 1; }
-  if (tEnd >= 1) { tEnd = 1; dir = -1; }
+  tEnd += dir * d * 0.45;
+  if (tEnd <= 0) {
+    tEnd = 0;
+    dir = 1;
+    cancelAnimationFrame(handle);
+    toggleInstanceVisibility(leftInstance);
+    toggleInstanceVisibility(rightInstance);
+  }
+  if (tEnd >= 1) {
+    tEnd = 1;
+    dir = -1; 
+    cancelAnimationFrame(handle);
+    // NOTE: Keep visible when complete
+  }
 
   // Update both instances
   updateCurveInstance(leftInstance,  tEnd);
@@ -165,6 +177,16 @@ function createCurveInstance(p: CreateCurveInstanceParams): Instance {
   // Caps (teardrops)
   const greenCap = makeTeardropCap(0x00ff00, CAP_PX_GREEN);
   const blueCap  = makeTeardropCap(0x0000ff, CAP_PX_BLUE);
+
+  green.obj.renderOrder = 1;
+  blue.obj.renderOrder  = 2;
+  greenCap.renderOrder  = 10;
+  blueCap.renderOrder   = 11;
+
+  setObjectZ(green.obj, 1);
+  setObjectZ(blue.obj,  2);
+  setObjectZ(greenCap,  3);
+  setObjectZ(blueCap,   4);
 
   group.add(greenCap);
   group.add(blueCap);
@@ -301,7 +323,8 @@ function makeCurvePoints(curve: THREE.Curve<THREE.Vector2>, color: THREE.ColorRe
     sizeAttenuation: false,
     color,
     forceSinglePass: true,
-    depthWrite: true,
+    depthTest: false,
+    depthWrite: false,
     side: THREE.FrontSide,
   });
 
@@ -367,10 +390,9 @@ function makeTeardropCap(color: THREE.ColorRepresentation, _size: number) {
   const mat = new THREE.MeshBasicMaterial({
     color,
     side: THREE.DoubleSide,
-    transparent: true,
-    opacity: 1,
     depthTest: false,
     depthWrite: false,
+    transparent: true,
   });
 
   const mesh = new THREE.Mesh(geom, mat);
@@ -389,3 +411,11 @@ function worldUnitsPerPixelOrtho(
   return visibleH / pxH;
 }
 
+const toggleObjVisibility = (o: THREE.Object3D) => o.visible = !o.visible;
+
+function toggleInstanceVisibility(i: Instance) {
+  toggleObjVisibility(i.blue.obj);
+  toggleObjVisibility(i.green.obj);
+  toggleObjVisibility(i.blueCap);
+  toggleObjVisibility(i.greenCap);
+}
