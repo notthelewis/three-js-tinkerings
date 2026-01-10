@@ -1,11 +1,20 @@
 import "./style.css";
 import * as THREE from "three";
 
+type ScreenWidth = "S" | "M" | "L"
+
+let screenWidth: ScreenWidth =  window.innerWidth <= 500 ? "S" : window.innerWidth <= 768 ? "M" : "L"
+
+const POINT_PX = 
+  screenWidth == "S"
+    ? 3
+    : screenWidth == "M"
+      ? 6
+      : 13
+
 const VIEW_HEIGHT   = 20; // World units visible vertically
-const POINT_PX      = 15; // Dot thickness in pixels 
 const CAP_PX_GREEN  = POINT_PX * 1.2;
 const CAP_PX_BLUE   = POINT_PX * 1.4;
-
 
 const GREEN = 0x00ff00;
 const BLUE  = 0x0000ff;
@@ -33,7 +42,7 @@ const segments = 2000;
 // Fixed gutter (world units at z=0). This becomes:
 // - gap between left & right instaces
 // - plus half-gutter padding to each screen edge
-const gutter = 0.1
+const gutter = 1
 
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -42,6 +51,7 @@ let running = false;
 document.addEventListener("keypress", (e) => {
   if (e.key !== " ") return;
   running = !running;
+  console.log("press ") 
   animate(lastTime);
 });
 
@@ -49,18 +59,20 @@ document.addEventListener("keypress", (e) => {
 // Build two curv instances (left & right)
 // ===================================================
 
+const startX = screenWidth === "S" ? 2 : screenWidth == "M" ? 3 : 4;
+
 const leftInstance = createCurveInstance({
-  //         start        end    control1       control2
-  //    s[x,    y]  e[x,   y]  c1[x,   y]    c2[x,    y]
-  green: [4,  0.4,   -4, 0.1,   0.5,   2,   -1.35,   -2],
-  blue:  [4,  0.4,   -4, 0.5,   0.5, 1.5,   -1.35, -2.5],
+  //         start        end    control1             control2
+  //    s[x,    y]  e[x,   y]  c1[x,   y]          c2[x,    y]
+  green: [startX ,  0.4,   -4, 0.1,   0.5,   2,   -1.35,   -2],
+  blue:  [startX,   0.4,   -4, 0.5,   0.5, 1.5,   -1.35, -2.5],
 });
 
 const rightInstance = createCurveInstance({
   //         start          end       control1    control2
   //    s[   x,     y]  e[x,  y]  c1[x,      y]   c2[ x,   y]
-  green: [-4.0, -0.54,   4, 0.1,   -1.35,   -2,     0.5,   2],
-  blue:  [-4.0, -0.54,   4, 0.5,   -1.35, -2.5,     0.5, 1.5],
+  green: [-startX, -0.54,   4, 0.1,   -1.35,   -2,     0.5,   2],
+  blue:  [-startX, -0.54,   4, 0.5,   -1.35, -2.5,     0.5, 1.5],
 });
 
 scene.add(leftInstance.group);
@@ -85,7 +97,6 @@ scene.add(circle);
 
 
 renderer.render(scene, camera);
-
 
 function animate(t: DOMHighResTimeStamp) {
   const handle = requestAnimationFrame(animate);
