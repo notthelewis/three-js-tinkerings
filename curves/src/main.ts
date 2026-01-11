@@ -14,6 +14,7 @@ let screenWidth: ScreenWidth =
         : "XL"
 
 
+// Width of lines, scaled according to screen size
 const POINT_PX = 
   screenWidth == "S"
     ? 3
@@ -30,9 +31,12 @@ const CAP_PX_BLUE   = POINT_PX * 1.4;
 const GREEN = 0x00ff00;
 const BLUE  = 0x0000ff;
 
-const segments = 2000;  // amount of line segments to animate (more is smoother, but more expensive)
-const speed = 0.3;     // t units per second
-const maxDT = 1 / 30;   // clamp dt to avoid big jumps
+const EPS = 1e-4;
+const clamp01 = (x: number) => Math.max(0, Math.min(1,x));
+
+const LINE_SEGMENTS = 2000;       // amount of line segments to animate (more is smoother, but more expensive)
+const SPEED = 0.3;                // t units per second
+const MAX_DELTA_TIME = 1 / 30;    // clamp delta time to avoid big jumps
 
 // Fixed gutter (world units at z=0). This becomes:
 // - gap between left & right instaces
@@ -57,24 +61,30 @@ const renderer = new THREE.WebGLRenderer({
   antialias: true,
 });
 
-
-
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 
+// Animation handles
 let running = false;
-let direction: Direction      = "forward";
-
+let direction: Direction = "forward";
 let tEnd = 0.001;
-let lastTime: DOMHighResTimeStamp; 
-let rafId: number | null = null;
+let lastTime: DOMHighResTimeStamp | undefined = performance.now();
+let rafId: number | null = null;                                        // current animation frame id
+
+let runId = 0;                                                          // Monotonically increasing token.
+                                                                        // This invalidates queued frames from old runs.
+
+let hasCompletedForwardRun = false;  // true when tEnd == 1 once
+let lifecycleCompleted = false;      // true when finished backward to 0
 
 document.addEventListener("keydown", (e) => {
   if (e.code !== "Space") return;
   e.preventDefault();
-  if (running) return; 
 
-  direction = chooseDirectionFromTE(tEnd);
+  if (running) return; 
+  if (lifecycleCompleted) return; 
+
+  direction = hasCompletedForwardRun ? "backward" : "forward";
 
   start(); 
 });
@@ -119,57 +129,81 @@ renderer.render(scene, camera);
 
 function start() {
   running = true; 
-  lastTime = performance.now();
-  rafId = requestAnimationFrame(tick);
+  runId++;
+  const thisRun = runId;
+
+  // Start slightly inside interval so end conditions aren't constantly tripped
+  if (direction === "forward") {
+    tEnd = Math.max(0, tEnd);             // keep current tEnd
+    if (tEnd <= EPS) tEnd = EPS;          // nudge off zero
+  } else {
+    tEnd = Math.min(1, tEnd);             // keep current tEnd
+    if (tEnd >= 1 - EPS) tEnd = 1 - EPS;  // nudge off one
+  }
+
+  lastTime = performance.now(); 
+  rafId = requestAnimationFrame(n => tick(n, thisRun));
 }
 
 function stop() {
   running = false; 
-  if (rafId !== null) {
-    cancelAnimationFrame(rafId);
-    rafId = null;
-  }
+  runId++;
+  lastTime = undefined;
 }
 
-function tick(now: DOMHighResTimeStamp) {
-  if (!running) return; 
+function tick(now: DOMHighResTimeStamp, thisRun: number) {
+  // If the tick isn't for cuurrent run, ignore
+  if (thisRun !== runId || !running) return;
 
-  if (lastTime === undefined) lastTime = now;
-
-  const deltaTime = Math.min(maxDT, (now - lastTime) / 1000);
+  const deltaTime = Math.min(MAX_DELTA_TIME, (now - (lastTime ?? now)) / 1000);
   lastTime = now;
 
   const sign = direction === "forward" ? 1 : -1;
-  tEnd += sign * deltaTime * speed; 
+  tEnd = clamp01(tEnd + sign * deltaTime * SPEED);
 
-  if (tEnd >= 1) {
-    tEnd = 1; 
+  // --- Hit end: forward complete ---
+  if (direction === "forward" && tEnd >= 1 - EPS) {
+    tEnd = 1;
+    hasCompletedForwardRun = true;
+
     updateCurveInstance(leftInstance, tEnd);
     updateCurveInstance(rightInstance, tEnd);
     renderer.render(scene, camera);
+
     stop();
     return;
   }
-  if (tEnd <= 0) {
+
+  // --- Hit start: backward complete -> lifecycle complete ---
+  if (direction === "backward" && tEnd <= EPS) {
     tEnd = 0;
+
     updateCurveInstance(leftInstance, tEnd);
     updateCurveInstance(rightInstance, tEnd);
-
     renderer.render(scene, camera);
 
-    toggleInstanceVisibility(leftInstance);
-    toggleInstanceVisibility(rightInstance);
+    // Only toggle AFTER the full forward->backward run
+    if (hasCompletedForwardRun) {
+      lifecycleCompleted = true;
+      toggleInstanceVisibility(leftInstance);
+      toggleInstanceVisibility(rightInstance);
+
+      // TODO: Call unmount callback here 
+      // onLifecycleComplete?.();
+    }
 
     stop();
     return;
   }
 
+  // Normal frame
   updateCurveInstance(leftInstance, tEnd);
   updateCurveInstance(rightInstance, tEnd);
   renderer.render(scene, camera);
 
-  rafId = requestAnimationFrame(tick);
+  rafId = requestAnimationFrame(t => tick(t, thisRun));
 }
+
 
 // function animate(t: DOMHighResTimeStamp) {
 //   const handle = requestAnimationFrame(animate);
@@ -306,7 +340,7 @@ function createCurveInstance(p: CreateCurveInstanceParams): Instance {
 }
 
 function updateCurveInstance(inst: Instance, tEnd: number) {
-  const count = Math.max(2, Math.floor(tEnd * segments) + 1);
+  const count = Math.max(2, Math.floor(tEnd * LINE_SEGMENTS) + 1);
 
   inst.green.geom.setDrawRange(0, count);
   inst.blue.geom.setDrawRange(0, count);
@@ -390,9 +424,9 @@ function create2DCurve([sx, sy, ex, ey, c1x, c1y, c2x, c2y]: CurveParams) {
 }
 
 function makeCurvePoints(curve: THREE.Curve<THREE.Vector2>, color: THREE.ColorRepresentation) {
-  const pts = curve.getPoints(segments);
+  const pts = curve.getPoints(LINE_SEGMENTS);
 
-  const positions = new Float32Array((segments + 1) * 3);
+  const positions = new Float32Array((LINE_SEGMENTS + 1) * 3);
   for (let i = 0; i < pts.length; i++) {
     positions[i * 3 + 0] = pts[i].x;
     positions[i * 3 + 1] = pts[i].y;
@@ -401,7 +435,7 @@ function makeCurvePoints(curve: THREE.Curve<THREE.Vector2>, color: THREE.ColorRe
 
   const geom = new THREE.BufferGeometry();
   geom.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  geom.setDrawRange(0, segments + 1);
+  geom.setDrawRange(0, LINE_SEGMENTS + 1);
 
   const mat = new THREE.PointsMaterial({
     size: POINT_PX,
@@ -503,13 +537,4 @@ function toggleInstanceVisibility(i: Instance) {
   toggleObjVisibility(i.green.obj);
   toggleObjVisibility(i.blueCap);
   toggleObjVisibility(i.greenCap);
-}
-
-function chooseDirectionFromTE(t: number): Direction {
-  const eps = 1e-4;
-  if (t <= eps) return "forward";
-  if (t >= 1 - eps) return "backward";
-
-  // mid-run: go toward the nearer end
-  return t < 0.5 ? "forward" : "backward";
 }
