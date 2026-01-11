@@ -139,7 +139,8 @@ layoutInstances();
 // ===================================================
 
 // Simple speckle noise used as alphaMap during dissolve
-const dissolveTexture = makeNoiseAlphaTexture(128);
+const dissolveTexture = makeNoiseAlphaTexture(256);
+const solidAlphaTex = makeSolidAlphaTexture();
 
 const orb = new THREE.Group();
 orb.visible = false;
@@ -149,18 +150,19 @@ const circleGeometry = new THREE.CircleGeometry(ORB_RADIUS, 125);
 const circleMaterial = new THREE.MeshBasicMaterial({
   color: 0xFFFFFFF ,
   transparent: true,
-  opacity: 0,
+  opacity: 1,
   depthTest: false,
   depthWrite: false,
-  alphaMap: dissolveTexture,
+  alphaMap: solidAlphaTex,
 });
+
 const circle = new THREE.Mesh(circleGeometry, circleMaterial);
 circle.renderOrder = 100; // Keep on top
 
 const playIcon = makePlayIcon({
   size: ORB_RADIUS * 0.55,
   color: 0x120e08,
-  alphaMap: dissolveTexture,
+  alphaMap: solidAlphaTex,
 });
 
 playIcon.position.z = 0.01;
@@ -550,6 +552,19 @@ function makeNoiseAlphaTexture(size: number) {
   return tex;
 }
 
+function makeSolidAlphaTexture() {
+  // RGBA, green channel is what alphaMap uses
+  const data = new Uint8Array([255, 255, 255, 255]);
+  const tex = new THREE.DataTexture(data, 1, 1, THREE.RGBAFormat, THREE.UnsignedByteType);
+  tex.needsUpdate = true;
+  tex.minFilter = THREE.NearestFilter;
+  tex.magFilter = THREE.NearestFilter;
+  tex.generateMipmaps = false;
+
+  tex.colorSpace = THREE.NoColorSpace;
+
+  return tex;
+}
 
 function makePlayIcon(opts: {
   size: number;
@@ -595,7 +610,24 @@ function setOrbDissolve(threshold: number) {
   pmat.alphaTest = threshold;
 }
 
+function setOrbAlphaMap(tex: THREE.Texture) {
+  const cmat = circle.material as THREE.MeshBasicMaterial;
+  const pmat = playIcon.material as THREE.MeshBasicMaterial;
+
+  if (cmat.alphaMap !== tex) {
+    cmat.alphaMap = tex;
+    cmat.needsUpdate = true;
+  }
+  if (pmat.alphaMap !== tex) {
+    pmat.alphaMap = tex;
+    pmat.needsUpdate = true;
+  }
+}
+
+
 function updateOrbDuringForward(tEnd: number) {
+  setOrbAlphaMap(solidAlphaTex);
+
   // progress from where forward started to 1
   const p = clamp((tEnd - forwardStartT) / Math.max(1e-6, 1 - forwardStartT), 0, 1);
   const e = easeOutCubic(p);
@@ -621,6 +653,13 @@ function updateOrbDuringBackward(tEnd: number) {
   // backward progress from 1 to 0; dissolve only over first fraction
   const backProgress = clamp((1 - tEnd) / BACKWARD_DISSOLVE_FRACTION, 0, 1);
   const e = easeInCubic(backProgress);
+
+  if (e <= 0) {
+    setOrbAlphaMap(solidAlphaTex);
+    setOrbDissolve(0);
+    setOrbOpacity(1);
+    return;
+  }
 
   orbState = backProgress >= 1 ? "gone" : "exiting";
 
