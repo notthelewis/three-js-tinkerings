@@ -1,7 +1,7 @@
-import { clamp } from "three/src/math/MathUtils.js";
+import { clamp, lerp } from "three/src/math/MathUtils.js";
 import "./style.css"
 import * as THREE from "three";
-import type { CreateCurveInstanceParams, CurveParams, Direction, Instance, ScreenWidth } from "./types";
+import type { CreateCurveInstanceParams, CurveParams, Direction, Instance, OrbState, ScreenWidth } from "./types";
 
 let screenWidth: ScreenWidth = window.innerWidth <= 500 
   ? "S" 
@@ -25,6 +25,7 @@ const CAP_PX_GREEN  = POINT_PX * 1.2;   // Size of green line cap
 const CAP_PX_BLUE   = POINT_PX * 1.4;   // Size of blue line cap
 
 const ORB_RADIUS = 0.5;
+const BACKWARD_DISSOLVE_FRACTION = 0.25; // 25% of backward run
 
 const GREEN = 0x00ff00; // Green colour code
 const BLUE  = 0x0000ff; // Blue colour code
@@ -60,13 +61,18 @@ const renderer = new THREE.WebGLRenderer({
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 
-// Animation handles
+// Animation state
 let running = false;
 let direction: Direction = "forward";
+let orbState: OrbState = "hidden";
 let tEnd = 0;
 let lastTime: DOMHighResTimeStamp | undefined = performance.now();
 let runId = 0;                                                          // Monotonically increasing token.
                                                                         // This invalidates queued frames from old runs.
+
+// Drop in is same duration as forward run, so it's driven from forward progress (tEnd) 
+let forwardStartT = 0;
+
 let hasStartedLifecycle = false;
 let hasCompletedForwardRun = false;  // true when tEnd == 1 once
 let lifecycleCompleted = false;      // true when finished backward to 0
@@ -132,22 +138,38 @@ layoutInstances();
 // Create the play button orb 
 // ===================================================
 
+// Simple speckle noise used as alphaMap during dissolve
+const dissolveTexture = makeNoiseAlphaTexture(128);
+
+const orb = new THREE.Group();
+orb.visible = false;
+orb.position.set(0, 0, camera.position.z + 2); // Behind camera, for drop in anim
+
 const circleGeometry = new THREE.CircleGeometry(ORB_RADIUS, 125);
-const circleMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFFF });
+const circleMaterial = new THREE.MeshBasicMaterial({
+  color: 0xFFFFFFF ,
+  transparent: true,
+  opacity: 0,
+  depthTest: false,
+  depthWrite: false,
+  alphaMap: dissolveTexture,
+});
 const circle = new THREE.Mesh(circleGeometry, circleMaterial);
 circle.renderOrder = 100; // Keep on top
-scene.add(circle);
 
 const playIcon = makePlayIcon({
   size: ORB_RADIUS * 0.55,
   color: 0x120e08,
+  alphaMap: dissolveTexture,
 });
 
-
-circle.add(playIcon);
 playIcon.position.z = 0.01;
+playIcon.renderOrder = 101;
 
-// setObjectZ(playIcon, 0.01);
+orb.add(circle);
+orb.add(playIcon);
+
+scene.add(orb);
 
 renderer.render(scene, camera);
 
@@ -178,6 +200,23 @@ function start() {
     if (tEnd >= 1 - EPS) tEnd = 1 - EPS;  // nudge off one
   }
 
+  // Handle orb animnations
+  if (direction === "forward" && !hasCompletedForwardRun) {
+    forwardStartT = tEnd;
+    orbState = "entering";
+    orb.visible = true; 
+    // Ensure orb is behind camera at start of first run forward
+    orb.position.z = camera.position.z + 2;
+    setOrbOpacity(0);
+    setOrbDissolve(0);
+  }
+  if (direction === "backward") {
+    orbState = "exiting";
+    orb.position.z = 0;
+    setOrbDissolve(0);
+    setOrbOpacity(1);
+  }
+
   lastTime = performance.now(); 
 
   updateCurveInstance(leftInstance, tEnd);
@@ -202,6 +241,14 @@ function tick(now: DOMHighResTimeStamp, thisRun: number) {
 
   const sign = direction === "forward" ? 1 : -1;
   tEnd = clamp(tEnd + sign * deltaTime * SPEED, 0, 1);
+
+  if (!lifecycleCompleted) {
+    if (direction === "forward" && !hasCompletedForwardRun) {
+      updateOrbDuringForward(tEnd);
+    } else if (direction === "backward") {
+      updateOrbDuringBackward(tEnd);
+    }
+  }
 
   // --- Hit end: forward complete ---
   if (direction === "forward" && tEnd >= 1 - EPS) {
@@ -470,36 +517,142 @@ function makeTeardropCap(color: THREE.ColorRepresentation, _size: number) {
   return mesh;
 }
 
-function makePlayIcon(opts: {size: number; color: THREE.ColorRepresentation }) {
-  const { size, color } = opts;
+function makeNoiseAlphaTexture(size: number) {
+  // RGBA texture; alphaMap will read the GREEN channel reliably
+  const data = new Uint8Array(size * size * 4);
 
-  // Right pointing triangle with its center ~(0,0)
-  // Tip +X, base -X
+  for (let i = 0; i < size * size; i++) {
+    const n = (Math.random() * 255) | 0;
+    const o = i * 4;
+
+    data[o + 0] = 255; // R (unused)
+    data[o + 1] = n;   // G (USED by alphaMap)
+    data[o + 2] = 255; // B (unused)
+    data[o + 3] = 255; // A (unused)
+  }
+
+  const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat, THREE.UnsignedByteType);
+  tex.needsUpdate = true;
+
+  // Make it look nicer / stable
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(2, 2);
+
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.generateMipmaps = false;
+
+  // Data textures should not be color-managed
+  // (Some versions use `colorSpace`, older use `encoding`)
+  tex.colorSpace = THREE.NoColorSpace;
+
+  return tex;
+}
+
+
+function makePlayIcon(opts: {
+  size: number;
+  color: THREE.ColorRepresentation;
+  alphaMap: THREE.Texture;
+}) {
+  const { size, color, alphaMap } = opts;
+
   const shape = new THREE.Shape();
-  shape.moveTo(-0.60,  0.75);
+  shape.moveTo(-0.60, 0.75);
   shape.lineTo(-0.60, -0.75);
-  shape.lineTo( 0.85,  0.00);
+  shape.lineTo(0.85, 0.00);
   shape.closePath();
 
-  const geometry = new THREE.ShapeGeometry(shape, 1);
+  const geom = new THREE.ShapeGeometry(shape, 1);
+  const mat = new THREE.MeshBasicMaterial({
+    color,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0,
+    depthTest: false,
+    depthWrite: false,
+    alphaMap,
+    alphaTest: 0,
+  });
 
-  const mesh = new THREE.Mesh(
-    geometry, 
-    new THREE.MeshBasicMaterial({
-      color,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 1,
-      depthTest: false,
-      depthWrite: false,
-    })
-  );
-
+  const mesh = new THREE.Mesh(geom, mat);
   mesh.scale.setScalar(size);
-  mesh.renderOrder = 101;
-
   return mesh;
 }
+
+function setOrbOpacity(alpha: number) {
+  const cmat = circle.material as THREE.MeshBasicMaterial;
+  const pmat = playIcon.material as THREE.MeshBasicMaterial;
+  cmat.opacity = alpha;
+  pmat.opacity = alpha;
+}
+
+function setOrbDissolve(threshold: number) {
+  const cmat = circle.material as THREE.MeshBasicMaterial;
+  const pmat = playIcon.material as THREE.MeshBasicMaterial;
+  cmat.alphaTest = threshold;
+  pmat.alphaTest = threshold;
+}
+
+function updateOrbDuringForward(tEnd: number) {
+  // progress from where forward started to 1
+  const p = clamp((tEnd - forwardStartT) / Math.max(1e-6, 1 - forwardStartT), 0, 1);
+  const e = easeOutCubic(p);
+
+  orb.visible = true;
+  orbState = p >= 1 ? "visible" : "entering";
+
+  // Drop-in: from behind camera to z=0
+  orb.position.z = lerp(camera.position.z + 2, 0, e);
+
+  // Fade + subtle scale in (ortho has no perspective, so scale helps)
+  setOrbDissolve(0);
+  setOrbOpacity(e);
+
+  const s = lerp(0.92, 1.0, e);
+  orb.scale.setScalar(s);
+
+  // optional tiny settle rotation
+  orb.rotation.z = lerp(0.08, 0, e);
+}
+
+function updateOrbDuringBackward(tEnd: number) {
+  // backward progress from 1 to 0; dissolve only over first fraction
+  const backProgress = clamp((1 - tEnd) / BACKWARD_DISSOLVE_FRACTION, 0, 1);
+  const e = easeInCubic(backProgress);
+
+  orbState = backProgress >= 1 ? "gone" : "exiting";
+
+  // Dissolve/fracture: alphaTest ramps up (cuts out noisy bits)
+  setOrbDissolve(e);
+
+  // Also fade out for a smoother finish
+  setOrbOpacity(1 - e);
+
+  // Aesthetic: slight shrink + tiny twist as it dissolves
+  const s = lerp(1.0, 0.92, e);
+  orb.scale.setScalar(s);
+  orb.rotation.z = lerp(0, -0.12, e);
+
+  if (backProgress >= 1) {
+    orb.visible = false;
+  }
+}
+
+
+// ===================================================
+// Easing 
+// ===================================================
+
+function easeOutCubic(t: number) {
+  return 1 - Math.pow(1 - t, 3);
+}
+
+function easeInCubic(t: number) {
+  return t * t * t;
+}
+
 
 // ===================================================
 // Camera
@@ -557,6 +710,7 @@ function cleanup() {
 
 function disposeInstance(i: Instance) {
   scene.remove(i.group);
+  scene.remove(orb);
 
   // Points
   disposePoints(i.green.obj);
@@ -565,6 +719,11 @@ function disposeInstance(i: Instance) {
   // Caps
   disposeMesh(i.greenCap);
   disposeMesh(i.blueCap);
+
+  // Play
+  disposeMesh(circle);
+  disposeMesh(playIcon);
+  dissolveTexture.dispose();
 
   // Remove children references
   i.group.clear();

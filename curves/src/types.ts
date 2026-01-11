@@ -1,7 +1,10 @@
 import * as THREE from "three";
 
 export type ScreenWidth = "S" | "M" | "L" | "XL"
+
 export type Direction = "forward" | "backward";
+export type OrbState = "hidden" | "entering" | "visible" | "exiting" | "gone";
+
 export type CurveObj = {
   obj: THREE.Points;
   geom: THREE.BufferGeometry;
@@ -30,3 +33,4 @@ export type CreateCurveInstanceParams = {
   green: CurveParams;
   blue: CurveParams;
 }
+
