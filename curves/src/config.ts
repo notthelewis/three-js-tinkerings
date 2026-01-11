@@ -5,7 +5,7 @@ export function getScreenWidth(w: number): ScreenWidth {
 }
 
 export function pointPxForScreen(sw: ScreenWidth): number {
-  return sw === "S" ? 2 : sw === "M" ? 6 : sw === "L" ? 8 : 9;
+  return sw === "S" ? 3 : sw === "M" ? 6 : sw === "L" ? 8 : 9;
 }
 
 export function makeConfig(sw: ScreenWidth): Config {
@@ -26,7 +26,7 @@ export function makeConfig(sw: ScreenWidth): Config {
     blue: 0x0000ff,
 
     lineSegments: 2000,
-    speed: 0.6,
+    speed: 1,
     maxDeltaTime: 1 / 30,
     eps: 1e-4,
   };
