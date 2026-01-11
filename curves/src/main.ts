@@ -1,3 +1,4 @@
+import { clamp } from "three/src/math/MathUtils.js";
 import "./style.css"
 import * as THREE from "three";
 
@@ -14,7 +15,7 @@ let screenWidth: ScreenWidth =
         : "XL"
 
 
-// Width of lines, scaled according to screen size
+// Size of lines, scaled according to screen width
 const POINT_PX = 
   screenWidth == "S"
     ? 3
@@ -22,7 +23,7 @@ const POINT_PX =
       ? 6
       : screenWidth == "L"
         ? 11
-        : 13
+        : 13;
 
 const VIEW_HEIGHT   = 20;               // World units visible vertically
 const CAP_PX_GREEN  = POINT_PX * 1.2;   // Size of green line cap
@@ -31,12 +32,13 @@ const CAP_PX_BLUE   = POINT_PX * 1.4;   // Size of blue line cap
 const GREEN = 0x00ff00; // Green colour code
 const BLUE  = 0x0000ff; // Blue colour code
 
-const EPS = 1e-4;
-const clamp01 = (x: number) => Math.max(0, Math.min(1,x));
 
 const LINE_SEGMENTS = 2000;       // amount of line segments to animate (more is smoother, but more expensive)
 const SPEED = 0.6;                // t units per second
 const MAX_DELTA_TIME = 1 / 30;    // clamp delta time to avoid big jumps
+
+// Floating point epsilon
+const EPS = 1e-4;
 
 // Fixed gutter (world units at z=0). This becomes:
 // - gap between left & right instaces
@@ -51,7 +53,6 @@ const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
 camera.position.set(0,0,10);
 camera.lookAt(0,0,0);
 
-const setObjectZ = (obj: THREE.Object3D, z: number) => obj.position.z = z;
 
 updateOrthoCamera();
 
@@ -71,8 +72,7 @@ let tEnd = 0;
 let lastTime: DOMHighResTimeStamp | undefined = performance.now();
 let runId = 0;                                                          // Monotonically increasing token.
                                                                         // This invalidates queued frames from old runs.
-
-let hasStartedLifecycle = false;     
+let hasStartedLifecycle = false;
 let hasCompletedForwardRun = false;  // true when tEnd == 1 once
 let lifecycleCompleted = false;      // true when finished backward to 0
 
@@ -188,7 +188,7 @@ function tick(now: DOMHighResTimeStamp, thisRun: number) {
   lastTime = now;
 
   const sign = direction === "forward" ? 1 : -1;
-  tEnd = clamp01(tEnd + sign * deltaTime * SPEED);
+  tEnd = clamp(tEnd + sign * deltaTime * SPEED, 0, 1);
 
   // --- Hit end: forward complete ---
   if (direction === "forward" && tEnd >= 1 - EPS) {
@@ -551,7 +551,6 @@ function disposeInstance(i: Instance) {
 
 function disposePoints(p: THREE.Points) {
   if (p.geometry) p.geometry.dispose();
-
   const m = p.material;
   if (Array.isArray(m)) m.forEach((mm) => mm.dispose());
   else m.dispose();
@@ -559,13 +558,10 @@ function disposePoints(p: THREE.Points) {
 
 function disposeMesh(m: THREE.Mesh) {
   if (m.geometry) m.geometry.dispose();
-
   const mat = m.material;
   if (Array.isArray(mat)) mat.forEach((mm) => mm.dispose());
   else mat.dispose();
 }
 
-
-function setInstanceVisible(i: Instance, v: boolean) {
-  i.group.visible = v;
-}
+function setObjectZ (obj: THREE.Object3D, z: number)  { obj.position.z = z;  }
+function setInstanceVisible (i: Instance, v: boolean) { i.group.visible = v; }
