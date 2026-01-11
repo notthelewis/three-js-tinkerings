@@ -1,38 +1,7 @@
 import { clamp } from "three/src/math/MathUtils.js";
 import "./style.css"
 import * as THREE from "three";
-
-type ScreenWidth = "S" | "M" | "L" | "XL"
-type Direction = "forward" | "backward";
-type CurveObj = {
-  obj: THREE.Points;
-  geom: THREE.BufferGeometry;
-  curve: THREE.Curve<THREE.Vector2>;
-};
-
-type Instance = {
-  group: THREE.Group;
-  green: CurveObj;
-  blue: CurveObj;
-  greenCap: THREE.Mesh;
-  blueCap: THREE.Mesh;
-  baseWidth: number; // unscaled width of the whole instance
-  originOffset: THREE.Vector3;
-};
-
-type N = number; 
-type CurveParams = [
-  sx:  N, sy:  N,
-  ex:  N, ey:  N,
-  c1x: N, c1y: N,
-  c2x: N, c2y: N,
-];
-
-type CreateCurveInstanceParams = {
-  green: CurveParams;
-  blue: CurveParams;
-}
-
+import type { CreateCurveInstanceParams, CurveParams, Direction, Instance, ScreenWidth } from "./types";
 
 let screenWidth: ScreenWidth = window.innerWidth <= 500 
   ? "S" 
@@ -41,7 +10,6 @@ let screenWidth: ScreenWidth = window.innerWidth <= 500
     : window.innerWidth <= 1024 
       ? "L" 
       : "XL"
-
 
 // Size of lines, scaled according to screen width
 const POINT_PX = screenWidth == "S"
@@ -80,7 +48,6 @@ const scene = new THREE.Scene();
 const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
 camera.position.set(0,0,10);
 camera.lookAt(0,0,0);
-
 
 updateOrthoCamera();
 
