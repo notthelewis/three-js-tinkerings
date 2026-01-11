@@ -25,7 +25,7 @@ const CAP_PX_GREEN  = POINT_PX * 1.2;   // Size of green line cap
 const CAP_PX_BLUE   = POINT_PX * 1.4;   // Size of blue line cap
 
 const ORB_RADIUS = 0.5;
-const BACKWARD_DISSOLVE_FRACTION = 0.25; // 25% of backward run
+const BACKWARD_DISSOLVE_FRACTION = 0.4; // 40% of backward run
 
 const GREEN = 0x00ff00; // Green colour code
 const BLUE  = 0x0000ff; // Blue colour code
