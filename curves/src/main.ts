@@ -2,6 +2,7 @@ import "./style.css";
 import * as THREE from "three";
 
 type ScreenWidth = "S" | "M" | "L" | "XL"
+type Direction = "forward" | "backward";
 
 let screenWidth: ScreenWidth = 
   window.innerWidth <= 500 
@@ -29,6 +30,15 @@ const CAP_PX_BLUE   = POINT_PX * 1.4;
 const GREEN = 0x00ff00;
 const BLUE  = 0x0000ff;
 
+const segments = 2000;  // amount of line segments to animate (more is smoother, but more expensive)
+const speed = 0.3;     // t units per second
+const maxDT = 1 / 30;   // clamp dt to avoid big jumps
+
+// Fixed gutter (world units at z=0). This becomes:
+// - gap between left & right instaces
+// - plus half-gutter padding to each screen edge
+const gutter = 1
+
 const canvas = document.querySelector("#bg");
 if (!canvas) throw new Error("unable to get canvas!");
 const scene = new THREE.Scene();
@@ -47,23 +57,26 @@ const renderer = new THREE.WebGLRenderer({
   antialias: true,
 });
 
-const segments = 2000;
 
-// Fixed gutter (world units at z=0). This becomes:
-// - gap between left & right instaces
-// - plus half-gutter padding to each screen edge
-const gutter = 1
 
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(window.innerWidth, window.innerHeight);
 
 let running = false;
-document.addEventListener("keypress", (e) => {
-  if (e.key !== " ") return;
-  console.log("press. before: ", running) 
-  running = !running;
-  console.log("press. before: ", running) 
-  animate(lastTime);
+let direction: Direction      = "forward";
+
+let tEnd = 0.001;
+let lastTime: DOMHighResTimeStamp; 
+let rafId: number | null = null;
+
+document.addEventListener("keydown", (e) => {
+  if (e.code !== "Space") return;
+  e.preventDefault();
+  if (running) return; 
+
+  direction = chooseDirectionFromTE(tEnd);
+
+  start(); 
 });
 
 
@@ -72,7 +85,6 @@ document.addEventListener("keypress", (e) => {
 // ===================================================
 
 const startX = screenWidth === "S" ? 2 : screenWidth == "M" ? 3 : 4;
-
 const leftInstance = createCurveInstance({
   //               start        end    control1             control2
   //    s[x,          y]  e[x,   y]  c1[x,   y]    c2[x,    y]
@@ -90,10 +102,6 @@ const rightInstance = createCurveInstance({
 scene.add(leftInstance.group);
 scene.add(rightInstance.group);
 
-// Animation: tEnd goes 1 -> 0 -> 1 ...
-let tEnd = 1;
-let dir = -1;
-let lastTime: DOMHighResTimeStamp = new Date().getTime();
 
 // Layout once initially
 layoutInstances();
@@ -108,40 +116,94 @@ const circle = new THREE.Mesh(circleGeometry, circleMaterial);
 scene.add(circle);
 
 renderer.render(scene, camera);
-animate(lastTime);
 
-function animate(t: DOMHighResTimeStamp) {
-  const handle = requestAnimationFrame(animate);
+function start() {
+  running = true; 
+  lastTime = performance.now();
+  rafId = requestAnimationFrame(tick);
+}
 
-  if (!running) {
-    lastTime = t;
+function stop() {
+  running = false; 
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+  }
+}
+
+function tick(now: DOMHighResTimeStamp) {
+  if (!running) return; 
+
+  if (lastTime === undefined) lastTime = now;
+
+  const deltaTime = Math.min(maxDT, (now - lastTime) / 1000);
+  lastTime = now;
+
+  const sign = direction === "forward" ? 1 : -1;
+  tEnd += sign * deltaTime * speed; 
+
+  if (tEnd >= 1) {
+    tEnd = 1; 
+    updateCurveInstance(leftInstance, tEnd);
+    updateCurveInstance(rightInstance, tEnd);
+    renderer.render(scene, camera);
+    stop();
+    return;
+  }
+  if (tEnd <= 0) {
+    tEnd = 0;
+    updateCurveInstance(leftInstance, tEnd);
+    updateCurveInstance(rightInstance, tEnd);
+
+    renderer.render(scene, camera);
+
+    toggleInstanceVisibility(leftInstance);
+    toggleInstanceVisibility(rightInstance);
+
+    stop();
     return;
   }
 
-  const d = (t - lastTime) / 1000;
-  lastTime = t;
-
-  tEnd += dir * d * 0.45;
-  if (tEnd <= 0) {
-    tEnd = 0;
-    dir = 1;
-    cancelAnimationFrame(handle);
-    toggleInstanceVisibility(leftInstance);
-    toggleInstanceVisibility(rightInstance);
-  }
-  if (tEnd >= 1) {
-    tEnd = 1;
-    dir = -1; 
-    cancelAnimationFrame(handle);
-    // NOTE: Keep visible when complete
-  }
-
-  // Update both instances
-  updateCurveInstance(leftInstance,  tEnd);
+  updateCurveInstance(leftInstance, tEnd);
   updateCurveInstance(rightInstance, tEnd);
-
   renderer.render(scene, camera);
+
+  rafId = requestAnimationFrame(tick);
 }
+
+// function animate(t: DOMHighResTimeStamp) {
+//   const handle = requestAnimationFrame(animate);
+//
+//   if (!running) {
+//     lastTime = t;
+//     return;
+//   }
+//
+//   const d = (t - lastTime) / 1000;
+//   lastTime = t;
+//
+//   tEnd += dir * d * 0.45;
+//   if (tEnd <= 0) {
+//     tEnd = 0;
+//     dir = 1;
+//     cancelAnimationFrame(handle);
+//     toggleInstanceVisibility(leftInstance);
+//     toggleInstanceVisibility(rightInstance);
+//     running = false;
+//   }
+//   if (tEnd >= 1) {
+//     tEnd = 1;
+//     dir = -1; 
+//     cancelAnimationFrame(handle);
+//     // NOTE: Keep visible when complete
+//   }
+//
+//   // Update both instances
+//   updateCurveInstance(leftInstance,  tEnd);
+//   updateCurveInstance(rightInstance, tEnd);
+//
+//   renderer.render(scene, camera);
+// }
 
 // Keep layout correct on resize
 window.addEventListener("resize", () => {
@@ -441,4 +503,13 @@ function toggleInstanceVisibility(i: Instance) {
   toggleObjVisibility(i.green.obj);
   toggleObjVisibility(i.blueCap);
   toggleObjVisibility(i.greenCap);
+}
+
+function chooseDirectionFromTE(t: number): Direction {
+  const eps = 1e-4;
+  if (t <= eps) return "forward";
+  if (t >= 1 - eps) return "backward";
+
+  // mid-run: go toward the nearer end
+  return t < 0.5 ? "forward" : "backward";
 }
