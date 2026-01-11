@@ -138,8 +138,6 @@ layoutInstances();
 // Create the play button orb 
 // ===================================================
 
-// Simple speckle noise used as alphaMap during dissolve
-const dissolveTexture = makeNoiseAlphaTexture(256);
 const solidAlphaTex = makeSolidAlphaTexture();
 
 const orb = new THREE.Group();
@@ -519,39 +517,6 @@ function makeTeardropCap(color: THREE.ColorRepresentation, _size: number) {
   return mesh;
 }
 
-function makeNoiseAlphaTexture(size: number) {
-  // RGBA texture; alphaMap will read the GREEN channel reliably
-  const data = new Uint8Array(size * size * 4);
-
-  for (let i = 0; i < size * size; i++) {
-    const n = (Math.random() * 255) | 0;
-    const o = i * 4;
-
-    data[o + 0] = 255; // R (unused)
-    data[o + 1] = n;   // G (USED by alphaMap)
-    data[o + 2] = 255; // B (unused)
-    data[o + 3] = 255; // A (unused)
-  }
-
-  const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat, THREE.UnsignedByteType);
-  tex.needsUpdate = true;
-
-  // Make it look nicer / stable
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(2, 2);
-
-  tex.minFilter = THREE.LinearFilter;
-  tex.magFilter = THREE.LinearFilter;
-  tex.generateMipmaps = false;
-
-  // Data textures should not be color-managed
-  // (Some versions use `colorSpace`, older use `encoding`)
-  tex.colorSpace = THREE.NoColorSpace;
-
-  return tex;
-}
-
 function makeSolidAlphaTexture() {
   // RGBA, green channel is what alphaMap uses
   const data = new Uint8Array([255, 255, 255, 255]);
@@ -762,7 +727,6 @@ function disposeInstance(i: Instance) {
   // Play
   disposeMesh(circle);
   disposeMesh(playIcon);
-  dissolveTexture.dispose();
 
   // Remove children references
   i.group.clear();
