@@ -4,34 +4,62 @@ import * as THREE from "three";
 
 type ScreenWidth = "S" | "M" | "L" | "XL"
 type Direction = "forward" | "backward";
+type CurveObj = {
+  obj: THREE.Points;
+  geom: THREE.BufferGeometry;
+  curve: THREE.Curve<THREE.Vector2>;
+};
 
-let screenWidth: ScreenWidth = 
-  window.innerWidth <= 500 
-    ? "S" 
-    : window.innerWidth <= 768 
-      ? "M" 
-      : window.innerWidth <= 1024 
-        ? "L" 
-        : "XL"
+type Instance = {
+  group: THREE.Group;
+  green: CurveObj;
+  blue: CurveObj;
+  greenCap: THREE.Mesh;
+  blueCap: THREE.Mesh;
+  baseWidth: number; // unscaled width of the whole instance
+  originOffset: THREE.Vector3;
+};
+
+type N = number; 
+type CurveParams = [
+  sx:  N, sy:  N,
+  ex:  N, ey:  N,
+  c1x: N, c1y: N,
+  c2x: N, c2y: N,
+];
+
+type CreateCurveInstanceParams = {
+  green: CurveParams;
+  blue: CurveParams;
+}
+
+
+let screenWidth: ScreenWidth = window.innerWidth <= 500 
+  ? "S" 
+  : window.innerWidth <= 768 
+    ? "M" 
+    : window.innerWidth <= 1024 
+      ? "L" 
+      : "XL"
 
 
 // Size of lines, scaled according to screen width
-const POINT_PX = 
-  screenWidth == "S"
-    ? 3
-    : screenWidth == "M"
-      ? 6
-      : screenWidth == "L"
-        ? 11
-        : 13;
+const POINT_PX = screenWidth == "S"
+  ? 3
+  : screenWidth == "M"
+    ? 6
+    : screenWidth == "L"
+      ? 11
+      : 13;
 
 const VIEW_HEIGHT   = 20;               // World units visible vertically
 const CAP_PX_GREEN  = POINT_PX * 1.2;   // Size of green line cap
 const CAP_PX_BLUE   = POINT_PX * 1.4;   // Size of blue line cap
 
+const ORB_RADIUS = 0.5;
+
 const GREEN = 0x00ff00; // Green colour code
 const BLUE  = 0x0000ff; // Blue colour code
-
 
 const LINE_SEGMENTS = 2000;       // amount of line segments to animate (more is smoother, but more expensive)
 const SPEED = 0.6;                // t units per second
@@ -86,6 +114,7 @@ function onKeyDown(e: KeyboardEvent) {
   if (lifecycleCompleted) return;
 
   direction = hasCompletedForwardRun ? "backward" : "forward";
+
   start();
 }
 
@@ -136,12 +165,29 @@ layoutInstances();
 // Create the play button orb 
 // ===================================================
 
-const circleGeometry = new THREE.CircleGeometry(0.5, 125);
+const circleGeometry = new THREE.CircleGeometry(ORB_RADIUS, 125);
 const circleMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFFF });
 const circle = new THREE.Mesh(circleGeometry, circleMaterial);
+circle.renderOrder = 100; // Keep on top
 scene.add(circle);
 
+const playIcon = makePlayIcon({
+  size: ORB_RADIUS * 0.55,
+  color: 0x120e08,
+});
+
+
+circle.add(playIcon);
+playIcon.position.z = 0.01;
+
+// setObjectZ(playIcon, 0.01);
+
 renderer.render(scene, camera);
+
+
+// ===================================================
+// Animation
+// ===================================================
 
 function start() {
   if (lifecycleCompleted) return;
@@ -239,34 +285,6 @@ function tick(now: DOMHighResTimeStamp, thisRun: number) {
 // Instance creation + layout
 // ===================================================
 
-type CurveObj = {
-  obj: THREE.Points;
-  geom: THREE.BufferGeometry;
-  curve: THREE.Curve<THREE.Vector2>;
-};
-
-type Instance = {
-  group: THREE.Group;
-  green: CurveObj;
-  blue: CurveObj;
-  greenCap: THREE.Mesh;
-  blueCap: THREE.Mesh;
-  baseWidth: number; // unscaled width of the whole instance
-  originOffset: THREE.Vector3;
-};
-
-type N = number; 
-type CurveParams = [
-  sx:  N, sy:  N,
-  ex:  N, ey:  N,
-  c1x: N, c1y: N,
-  c2x: N, c2y: N,
-];
-
-type CreateCurveInstanceParams = {
-  green: CurveParams;
-  blue: CurveParams;
-}
 
 function createCurveInstance(p: CreateCurveInstanceParams): Instance {
   const group = new THREE.Group();
@@ -365,11 +383,6 @@ function layoutInstances() {
   updateCurveInstance(rightInstance, tEnd);
 }
 
-function getVisibleSize(cam: THREE.OrthographicCamera) {
-  const width = (cam.right - cam.left) / cam.zoom;
-  const height = (cam.top - cam.bottom) / cam.zoom;
-  return { width, height };
-}
 
 function normalizeGroupOrigin(group: THREE.Group): THREE.Vector3 {
   group.updateMatrixWorld(true);
@@ -383,21 +396,6 @@ function normalizeGroupOrigin(group: THREE.Group): THREE.Vector3 {
   }
 
   return center; 
-}
-
-// ===================================================
-// HELPERS
-// ===================================================
-
-function updateOrthoCamera() {
-  const aspect = window.innerWidth / window.innerHeight;
-
-  camera.top = VIEW_HEIGHT / 2;
-  camera.bottom = -VIEW_HEIGHT / 2;
-  camera.left = -(VIEW_HEIGHT * aspect) / 2;
-  camera.right = (VIEW_HEIGHT * aspect) / 2;
-
-  camera.updateProjectionMatrix();
 }
 
 function create2DCurve([sx, sy, ex, ey, c1x, c1y, c2x, c2y]: CurveParams) {
@@ -505,6 +503,52 @@ function makeTeardropCap(color: THREE.ColorRepresentation, _size: number) {
   return mesh;
 }
 
+function makePlayIcon(opts: {size: number; color: THREE.ColorRepresentation }) {
+  const { size, color } = opts;
+
+  // Right pointing triangle with its center ~(0,0)
+  // Tip +X, base -X
+  const shape = new THREE.Shape();
+  shape.moveTo(-0.60,  0.75);
+  shape.lineTo(-0.60, -0.75);
+  shape.lineTo( 0.85,  0.00);
+  shape.closePath();
+
+  const geometry = new THREE.ShapeGeometry(shape, 1);
+
+  const mesh = new THREE.Mesh(
+    geometry, 
+    new THREE.MeshBasicMaterial({
+      color,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 1,
+      depthTest: false,
+      depthWrite: false,
+    })
+  );
+
+  mesh.scale.setScalar(size);
+  mesh.renderOrder = 101;
+
+  return mesh;
+}
+
+// ===================================================
+// Camera
+// ===================================================
+
+function updateOrthoCamera() {
+  const aspect = window.innerWidth / window.innerHeight;
+
+  camera.top = VIEW_HEIGHT / 2;
+  camera.bottom = -VIEW_HEIGHT / 2;
+  camera.left = -(VIEW_HEIGHT * aspect) / 2;
+  camera.right = (VIEW_HEIGHT * aspect) / 2;
+
+  camera.updateProjectionMatrix();
+}
+
 function worldUnitsPerPixelOrtho(
   cam: THREE.OrthographicCamera,
   renderer: THREE.WebGLRenderer
@@ -514,6 +558,16 @@ function worldUnitsPerPixelOrtho(
   const visibleH = (cam.top - cam.bottom) / cam.zoom;
   return visibleH / pxH;
 }
+
+function getVisibleSize(cam: THREE.OrthographicCamera) {
+  const width = (cam.right - cam.left) / cam.zoom;
+  const height = (cam.top - cam.bottom) / cam.zoom;
+  return { width, height };
+}
+
+// ===================================================
+// Lifecycle
+// ===================================================
 
 function cleanup() {
   // Invalidate any queued ticks and prevent new ones
