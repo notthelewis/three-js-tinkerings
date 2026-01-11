@@ -205,3 +205,32 @@ export function applyLayout(left: Instance, right: Instance, layout: ReturnType<
   right.group.position.set(+layout.xCenter, 0, 0);
 }
 
+
+// PERF: This is quick enough if only called on orb move / resize. Don't call it every animation frame.
+export function retargetCurveObj(cfg: Config, obj: Instance["green"], params: CurveParams) {
+  const [sx, sy, ex, ey, c1x, c1y, c2x, c2y] = params;
+
+  const curve = new THREE.CubicBezierCurve(
+    new THREE.Vector2(sx, sy),
+    new THREE.Vector2(c1x, c1y),
+    new THREE.Vector2(c2x, c2y),
+    new THREE.Vector2(ex, ey),
+  );
+
+  obj.curve = curve;
+
+  const pts = curve.getPoints(cfg.lineSegments);
+  const pos = obj.geom.getAttribute("position") as THREE.BufferAttribute;
+
+  // assumes geometry was allocated as (segments+1)*3 already
+  for (let i = 0; i < pts.length; i++) {
+    pos.setXYZ(i, pts[i].x, pts[i].y, 0);
+  }
+  pos.needsUpdate = true;
+}
+
+// Convenience: retarget both lines for an instance
+export function retargetInstance(cfg: Config, inst: Instance, p: { green: CurveParams; blue: CurveParams }) {
+  retargetCurveObj(cfg, inst.green, p.green);
+  retargetCurveObj(cfg, inst.blue, p.blue);
+}
