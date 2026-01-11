@@ -1,4 +1,4 @@
-import "./style.css";
+import "./style.css"
 import * as THREE from "three";
 
 type ScreenWidth = "S" | "M" | "L" | "XL"
@@ -24,18 +24,18 @@ const POINT_PX =
         ? 11
         : 13
 
-const VIEW_HEIGHT   = 20; // World units visible vertically
-const CAP_PX_GREEN  = POINT_PX * 1.2;
-const CAP_PX_BLUE   = POINT_PX * 1.4;
+const VIEW_HEIGHT   = 20;               // World units visible vertically
+const CAP_PX_GREEN  = POINT_PX * 1.2;   // Size of green line cap
+const CAP_PX_BLUE   = POINT_PX * 1.4;   // Size of blue line cap
 
-const GREEN = 0x00ff00;
-const BLUE  = 0x0000ff;
+const GREEN = 0x00ff00; // Green colour code
+const BLUE  = 0x0000ff; // Blue colour code
 
 const EPS = 1e-4;
 const clamp01 = (x: number) => Math.max(0, Math.min(1,x));
 
 const LINE_SEGMENTS = 2000;       // amount of line segments to animate (more is smoother, but more expensive)
-const SPEED = 0.3;                // t units per second
+const SPEED = 0.6;                // t units per second
 const MAX_DELTA_TIME = 1 / 30;    // clamp delta time to avoid big jumps
 
 // Fixed gutter (world units at z=0). This becomes:
@@ -67,27 +67,37 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 // Animation handles
 let running = false;
 let direction: Direction = "forward";
-let tEnd = 0.001;
+let tEnd = 0;
 let lastTime: DOMHighResTimeStamp | undefined = performance.now();
-let rafId: number | null = null;                                        // current animation frame id
-
 let runId = 0;                                                          // Monotonically increasing token.
                                                                         // This invalidates queued frames from old runs.
 
+let hasStartedLifecycle = false;     
 let hasCompletedForwardRun = false;  // true when tEnd == 1 once
 let lifecycleCompleted = false;      // true when finished backward to 0
 
-document.addEventListener("keydown", (e) => {
+document.addEventListener("keydown", onKeyDown);
+window.addEventListener("resize", onResize);
+
+function onKeyDown(e: KeyboardEvent) {
   if (e.code !== "Space") return;
   e.preventDefault();
-
-  if (running) return; 
-  if (lifecycleCompleted) return; 
+  if (running) return;
+  if (lifecycleCompleted) return;
 
   direction = hasCompletedForwardRun ? "backward" : "forward";
+  start();
+}
 
-  start(); 
-});
+function onResize() {
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  updateOrthoCamera();
+  layoutInstances();
+
+  renderer.render(scene, camera);
+}
 
 
 // ===================================================
@@ -109,9 +119,15 @@ const rightInstance = createCurveInstance({
   blue:  [-startX, -0.54,   4, 0.5,   -1.35, -2.5,     0.5, 1.5],
 });
 
+
 scene.add(leftInstance.group);
 scene.add(rightInstance.group);
 
+// Start at 0 (collapsed) but invisible
+setInstanceVisible(leftInstance, false);
+setInstanceVisible(rightInstance, false);
+updateCurveInstance(leftInstance, tEnd);
+updateCurveInstance(rightInstance, tEnd);
 
 // Layout once initially
 layoutInstances();
@@ -128,6 +144,14 @@ scene.add(circle);
 renderer.render(scene, camera);
 
 function start() {
+  if (lifecycleCompleted) return;
+
+  if (!hasStartedLifecycle) {
+    hasStartedLifecycle = true; 
+    setInstanceVisible(leftInstance, true);
+    setInstanceVisible(rightInstance, true);
+  }
+
   running = true; 
   runId++;
   const thisRun = runId;
@@ -142,7 +166,12 @@ function start() {
   }
 
   lastTime = performance.now(); 
-  rafId = requestAnimationFrame(n => tick(n, thisRun));
+
+  updateCurveInstance(leftInstance, tEnd);
+  updateCurveInstance(rightInstance, tEnd);
+  renderer.render(scene, camera);
+
+  requestAnimationFrame(n => tick(n, thisRun));
 }
 
 function stop() {
@@ -182,73 +211,29 @@ function tick(now: DOMHighResTimeStamp, thisRun: number) {
     updateCurveInstance(rightInstance, tEnd);
     renderer.render(scene, camera);
 
-    // Only toggle AFTER the full forward->backward run
-    if (hasCompletedForwardRun) {
-      lifecycleCompleted = true;
-      toggleInstanceVisibility(leftInstance);
-      toggleInstanceVisibility(rightInstance);
+    setInstanceVisible(leftInstance, false);
+    setInstanceVisible(rightInstance, false);
+    renderer.render(scene, camera);
 
-      // TODO: Call unmount callback here 
-      // onLifecycleComplete?.();
-    }
+    lifecycleCompleted = true;
 
     stop();
+
+    // Dispose + remove everything (unmount)
+    cleanup();
+
     return;
   }
 
   // Normal frame
   updateCurveInstance(leftInstance, tEnd);
   updateCurveInstance(rightInstance, tEnd);
+
   renderer.render(scene, camera);
 
-  rafId = requestAnimationFrame(t => tick(t, thisRun));
+  requestAnimationFrame(t => tick(t, thisRun));
 }
 
-
-// function animate(t: DOMHighResTimeStamp) {
-//   const handle = requestAnimationFrame(animate);
-//
-//   if (!running) {
-//     lastTime = t;
-//     return;
-//   }
-//
-//   const d = (t - lastTime) / 1000;
-//   lastTime = t;
-//
-//   tEnd += dir * d * 0.45;
-//   if (tEnd <= 0) {
-//     tEnd = 0;
-//     dir = 1;
-//     cancelAnimationFrame(handle);
-//     toggleInstanceVisibility(leftInstance);
-//     toggleInstanceVisibility(rightInstance);
-//     running = false;
-//   }
-//   if (tEnd >= 1) {
-//     tEnd = 1;
-//     dir = -1; 
-//     cancelAnimationFrame(handle);
-//     // NOTE: Keep visible when complete
-//   }
-//
-//   // Update both instances
-//   updateCurveInstance(leftInstance,  tEnd);
-//   updateCurveInstance(rightInstance, tEnd);
-//
-//   renderer.render(scene, camera);
-// }
-
-// Keep layout correct on resize
-window.addEventListener("resize", () => {
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(window.innerWidth, window.innerHeight);
-
-  updateOrthoCamera();
-  layoutInstances();
-
-  renderer.render(scene, camera);
-});
 
 // ===================================================
 // Instance creation + layout
@@ -530,11 +515,57 @@ function worldUnitsPerPixelOrtho(
   return visibleH / pxH;
 }
 
-const toggleObjVisibility = (o: THREE.Object3D) => o.visible = !o.visible;
+function cleanup() {
+  // Invalidate any queued ticks and prevent new ones
+  running = false;
+  runId++;
 
-function toggleInstanceVisibility(i: Instance) {
-  toggleObjVisibility(i.blue.obj);
-  toggleObjVisibility(i.green.obj);
-  toggleObjVisibility(i.blueCap);
-  toggleObjVisibility(i.greenCap);
+  setInstanceVisible(leftInstance, false);
+  setInstanceVisible(rightInstance, false);  
+
+  disposeInstance(leftInstance);
+  disposeInstance(rightInstance);
+
+  // fully dispose renderer if unmounting the whole canvas
+  // renderer.dispose();
+
+  // Remove event listeners
+  window.removeEventListener("resize", onResize);
+  document.removeEventListener("keydown", onKeyDown);
+}
+
+function disposeInstance(i: Instance) {
+  scene.remove(i.group);
+
+  // Points
+  disposePoints(i.green.obj);
+  disposePoints(i.blue.obj);
+
+  // Caps
+  disposeMesh(i.greenCap);
+  disposeMesh(i.blueCap);
+
+  // Remove children references
+  i.group.clear();
+}
+
+function disposePoints(p: THREE.Points) {
+  if (p.geometry) p.geometry.dispose();
+
+  const m = p.material;
+  if (Array.isArray(m)) m.forEach((mm) => mm.dispose());
+  else m.dispose();
+}
+
+function disposeMesh(m: THREE.Mesh) {
+  if (m.geometry) m.geometry.dispose();
+
+  const mat = m.material;
+  if (Array.isArray(mat)) mat.forEach((mm) => mm.dispose());
+  else mat.dispose();
+}
+
+
+function setInstanceVisible(i: Instance, v: boolean) {
+  i.group.visible = v;
 }
