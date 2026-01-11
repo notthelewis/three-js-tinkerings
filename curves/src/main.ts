@@ -704,6 +704,8 @@ function cleanup() {
   disposeInstance(leftInstance);
   disposeInstance(rightInstance);
 
+  solidAlphaTex.dispose();
+
   // fully dispose renderer if unmounting the whole canvas
   // renderer.dispose();
 
