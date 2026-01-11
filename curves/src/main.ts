@@ -1,16 +1,26 @@
 import "./style.css";
 import * as THREE from "three";
 
-type ScreenWidth = "S" | "M" | "L"
+type ScreenWidth = "S" | "M" | "L" | "XL"
 
-let screenWidth: ScreenWidth =  window.innerWidth <= 500 ? "S" : window.innerWidth <= 768 ? "M" : "L"
+let screenWidth: ScreenWidth = 
+  window.innerWidth <= 500 
+    ? "S" 
+    : window.innerWidth <= 768 
+      ? "M" 
+      : window.innerWidth <= 1024 
+        ? "L" 
+        : "XL"
+
 
 const POINT_PX = 
   screenWidth == "S"
     ? 3
     : screenWidth == "M"
       ? 6
-      : 13
+      : screenWidth == "L"
+        ? 11
+        : 13
 
 const VIEW_HEIGHT   = 20; // World units visible vertically
 const CAP_PX_GREEN  = POINT_PX * 1.2;
@@ -50,10 +60,12 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 let running = false;
 document.addEventListener("keypress", (e) => {
   if (e.key !== " ") return;
+  console.log("press. before: ", running) 
   running = !running;
-  console.log("press ") 
+  console.log("press. before: ", running) 
   animate(lastTime);
 });
+
 
 // ===================================================
 // Build two curv instances (left & right)
@@ -62,15 +74,15 @@ document.addEventListener("keypress", (e) => {
 const startX = screenWidth === "S" ? 2 : screenWidth == "M" ? 3 : 4;
 
 const leftInstance = createCurveInstance({
-  //         start        end    control1             control2
-  //    s[x,    y]  e[x,   y]  c1[x,   y]          c2[x,    y]
-  green: [startX ,  0.4,   -4, 0.1,   0.5,   2,   -1.35,   -2],
+  //               start        end    control1             control2
+  //    s[x,          y]  e[x,   y]  c1[x,   y]    c2[x,    y]
+  green: [startX,   0.4,   -4, 0.1,   0.5,   2,   -1.35,   -2],
   blue:  [startX,   0.4,   -4, 0.5,   0.5, 1.5,   -1.35, -2.5],
 });
 
 const rightInstance = createCurveInstance({
-  //         start          end       control1    control2
-  //    s[   x,     y]  e[x,  y]  c1[x,      y]   c2[ x,   y]
+  //             start          end       control1    control2
+  //    s[   x,        y]  e[x,  y]  c1[x,      y]   c2[x,   y]
   green: [-startX, -0.54,   4, 0.1,   -1.35,   -2,     0.5,   2],
   blue:  [-startX, -0.54,   4, 0.5,   -1.35, -2.5,     0.5, 1.5],
 });
@@ -95,8 +107,8 @@ const circleMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFFF });
 const circle = new THREE.Mesh(circleGeometry, circleMaterial);
 scene.add(circle);
 
-
 renderer.render(scene, camera);
+animate(lastTime);
 
 function animate(t: DOMHighResTimeStamp) {
   const handle = requestAnimationFrame(animate);
